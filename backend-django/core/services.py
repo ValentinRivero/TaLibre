@@ -27,7 +27,12 @@ from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from . import node_client
-from .catalogo_notificaciones import RolBaseNotificacion, TipoNotificacion, combinaciones_validas
+from .catalogo_notificaciones import (
+    CATALOGO,
+    RolBaseNotificacion,
+    TipoNotificacion,
+    combinaciones_validas,
+)
 from .email_service import EmailService, armar_codigo_recuperacion
 from .exceptions import ConflictoConConfirmacion, ConflictoNegocio, ServicioNoDisponible
 from .models import (
@@ -3369,6 +3374,79 @@ class PreferenciaNotificacionService:
     @staticmethod
     def invalidar_cache():
         cache.delete(PreferenciaNotificacionService.CLAVE_CACHE)
+
+    @staticmethod
+    def matriz():
+        """
+        La matriz completa para la pantalla de administración, leída de la base (no de la caché: quien configura
+        necesita ver lo guardado). Cada categoría trae sus roles aplicables y, por rol, `True` o `False`, o `None`
+        donde la combinación no existe, para que el cliente la dibuje sin repetir las reglas del catálogo.
+        """
+        guardadas = PreferenciaNotificacionRepository.guardadas()
+        return {
+            'roles': [{'codigo': rol.value, 'nombre': rol.label} for rol in RolBaseNotificacion],
+            'categorias': [
+                {
+                    'codigo': definicion.codigo,
+                    'nombre': definicion.nombre,
+                    'orden': definicion.orden,
+                    'roles_aplicables': [rol.value for rol in RolBaseNotificacion if rol in definicion.roles_aplicables],
+                    'habilitadas': {
+                        rol.value: guardadas.get((rol.value, definicion.codigo), True)
+                        if rol in definicion.roles_aplicables else None
+                        for rol in RolBaseNotificacion
+                    },
+                }
+                for definicion in sorted(CATALOGO, key=lambda definicion: definicion.orden)
+            ],
+        }
+
+    @staticmethod
+    def _aplicar(rol_base, tipo, habilitada, existentes):
+        """
+        Persiste un par si cambia su valor efectivo y devuelve si cambió. Sin fila vigente rige el valor por defecto
+        (habilitada), así que pedir ese mismo valor no crea nada; una fila dada de baja se reactiva en lugar de insertar
+        otra, que chocaría con la restricción de unicidad.
+        """
+        fila = existentes.get((rol_base, tipo))
+        vigente = fila is not None and fila.estado == EstadoRegistro.ACTIVO
+        actual = fila.habilitada if vigente else True
+        if actual == habilitada:
+            return False
+        if fila is None:
+            existentes[(rol_base, tipo)] = PreferenciaNotificacionRepository.crear(rol_base, tipo, habilitada)
+        else:
+            PreferenciaNotificacionRepository.actualizar(fila, habilitada)
+        return True
+
+    @staticmethod
+    def actualizar(preferencias, actor, ip_origen):
+        """
+        Aplica los pares `{rol_base, tipo_notificacion, habilitada}` ya validados, de forma atómica. Audita solo si
+        algún valor cambió de verdad, sin datos personales: los pares y su nuevo estado. La caché se descarta recién al
+        confirmar la transacción, para que nadie la repueble con los valores anteriores.
+        """
+        activadas, desactivadas = [], []
+        try:
+            with transaction.atomic():
+                existentes = PreferenciaNotificacionRepository.todas_bloqueadas()
+                for item in preferencias:
+                    rol_base, tipo, habilitada = item['rol_base'], item['tipo_notificacion'], item['habilitada']
+                    if PreferenciaNotificacionService._aplicar(rol_base, tipo, habilitada, existentes):
+                        (activadas if habilitada else desactivadas).append(f'{tipo}:{rol_base}')
+                if activadas or desactivadas:
+                    AuditoriaService.registrar(
+                        TipoEventoAuditoria.CAMBIO_PREFERENCIAS_NOTIFICACIONES, 'Cambio de preferencias de notificaciones por rol',
+                        detalle=(
+                            f'Activadas: {", ".join(sorted(activadas)) or "ninguna"}. '
+                            f'Desactivadas: {", ".join(sorted(desactivadas)) or "ninguna"}.'
+                        ),
+                        usuario=actor, ip_origen=ip_origen,
+                    )
+                    transaction.on_commit(PreferenciaNotificacionService.invalidar_cache)
+        except IntegrityError:
+            raise ConflictoNegocio('Otra persona modificó las preferencias al mismo tiempo. Reintentá.') from None
+        return PreferenciaNotificacionService.matriz()
 
 
 class DestinatariosService:

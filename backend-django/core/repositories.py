@@ -1184,6 +1184,26 @@ class PreferenciaNotificacionRepository:
         )
         return {(rol_base, tipo): habilitada for rol_base, tipo, habilitada in filas}
 
+    @staticmethod
+    def todas_bloqueadas():
+        """Todas las filas, también las dadas de baja, con bloqueo: {(rol_base, tipo_notificacion): fila}."""
+        filas = PreferenciaNotificacionRol.objects.select_for_update().all()
+        return {(fila.rol_base, fila.tipo_notificacion): fila for fila in filas}
+
+    @staticmethod
+    def crear(rol_base, tipo_notificacion, habilitada):
+        return PreferenciaNotificacionRol.objects.create(
+            rol_base=rol_base, tipo_notificacion=tipo_notificacion, habilitada=habilitada,
+        )
+
+    @staticmethod
+    def actualizar(fila, habilitada):
+        """Deja la fila vigente con el valor indicado: reactiva una baja lógica en lugar de duplicarla."""
+        fila.habilitada = habilitada
+        fila.estado = EstadoRegistro.ACTIVO
+        fila.save(update_fields=['habilitada', 'estado', 'fecha_modificacion'])
+        return fila
+
 
 class AuditoriaRepository:
     @staticmethod

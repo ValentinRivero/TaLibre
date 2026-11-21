@@ -199,6 +199,7 @@ class TipoEventoAuditoria(models.IntegerChoices):
     CODIGO_RECUPERACION_BLOQUEADO = 21, 'Código de recuperación bloqueado por intentos fallidos'
     CONTRASENA_RESTABLECIDA = 22, 'Contraseña restablecida con código de recuperación'
     CAMBIO_CONTRASENA = 23, 'Cambio de contraseña desde la cuenta'
+    CAMBIO_PREFERENCIAS_NOTIFICACIONES = 24, 'Cambio de preferencias de notificaciones'
 
 
 class Rol(ModeloBase):

@@ -22,7 +22,17 @@ from core.catalogo_notificaciones import (
     es_combinacion_valida,
 )
 from core.email_service import EmailService, armar_codigo_recuperacion
-from core.models import EstadoRegistro, Permiso, PreferenciaNotificacionRol, Rol, RolPermiso, Usuario
+from core.models import (
+    EstadoRegistro,
+    LogAuditoria,
+    Permiso,
+    PreferenciaNotificacionRol,
+    Rol,
+    RolPermiso,
+    TipoEventoAuditoria,
+    Usuario,
+)
+from core.repositories import PreferenciaNotificacionRepository
 from core.services import (
     CATEGORIA_AVISO_RESERVAS,
     CATEGORIA_AVISO_SISTEMA,
@@ -31,6 +41,7 @@ from core.services import (
     CorreoService,
     RecordatorioService,
     ReservaService,
+    RolAdminService,
 )
 from core.services import PreferenciaNotificacionService as Servicio
 
@@ -634,3 +645,368 @@ class TestCorreoIndependiente:
         from core import email_service
 
         assert 'preferencia' not in inspect.getsource(email_service).lower()
+
+
+URL_PREFERENCIAS = '/api/sistema/notificaciones/preferencias/'
+
+
+def _item(tipo, rol, habilitada):
+    return {'tipo_notificacion': tipo, 'rol_base': rol, 'habilitada': habilitada}
+
+
+def _cuerpo(*items):
+    return {'preferencias': list(items)}
+
+
+def _categoria(matriz, codigo):
+    return next(categoria for categoria in matriz['categorias'] if categoria['codigo'] == codigo)
+
+
+def _auditoria():
+    return LogAuditoria.objects.filter(tipo_evento=TipoEventoAuditoria.CAMBIO_PREFERENCIAS_NOTIFICACIONES)
+
+
+@pytest.fixture
+def api(superadmin, cliente_de):
+    return cliente_de(superadmin)
+
+
+@pytest.fixture
+def poner(api, django_capture_on_commit_callbacks):
+    """PUT con los callbacks de `on_commit` ejecutados, como ocurre al confirmar la transacción en producción."""
+
+    def _poner(*items):
+        with django_capture_on_commit_callbacks(execute=True):
+            return api.put(URL_PREFERENCIAS, _cuerpo(*items), format='json')
+
+    return _poner
+
+
+@pytest.mark.django_db
+class TestConsultaDeLaMatriz:
+    def test_estructura_con_roles_y_categorias_ordenados(self, api):
+        respuesta = api.get(URL_PREFERENCIAS)
+
+        assert respuesta.status_code == 200
+        assert set(respuesta.data) == {'roles', 'categorias'}
+        assert [rol['codigo'] for rol in respuesta.data['roles']] == ['jugador', 'operador', 'dueno', 'superadmin']
+        assert all(set(rol) == {'codigo', 'nombre'} for rol in respuesta.data['roles'])
+        categorias = respuesta.data['categorias']
+        assert [categoria['orden'] for categoria in categorias] == list(range(1, 9))
+        assert [categoria['codigo'] for categoria in categorias] == [definicion.codigo for definicion in CATALOGO]
+        assert all(
+            set(categoria) == {'codigo', 'nombre', 'orden', 'roles_aplicables', 'habilitadas'} for categoria in categorias
+        )
+
+    def test_habilitadas_es_true_donde_aplica_y_null_donde_no(self, api):
+        matriz = api.get(URL_PREFERENCIAS).data
+
+        reservas = _categoria(matriz, 'reservas')
+        assert reservas['roles_aplicables'] == ['jugador', 'operador', 'dueno']
+        assert reservas['habilitadas'] == {'jugador': True, 'operador': True, 'dueno': True, 'superadmin': None}
+        recordatorios = _categoria(matriz, 'recordatorios_turno')
+        assert recordatorios['habilitadas'] == {'jugador': True, 'operador': None, 'dueno': None, 'superadmin': None}
+
+    def test_expone_exactamente_las_14_combinaciones_validas(self, api):
+        matriz = api.get(URL_PREFERENCIAS).data
+
+        pares = {
+            (rol, categoria['codigo'])
+            for categoria in matriz['categorias'] for rol, valor in categoria['habilitadas'].items() if valor is not None
+        }
+        assert pares == set(combinaciones_validas()) and len(pares) == 14
+
+    def test_refleja_lo_guardado_y_ignora_las_filas_dadas_de_baja(self, api):
+        _guardar('jugador', 'reservas', habilitada=False)
+        _guardar('operador', 'reservas', habilitada=False).desactivar()
+
+        reservas = _categoria(api.get(URL_PREFERENCIAS).data, 'reservas')
+
+        assert reservas['habilitadas']['jugador'] is False
+        assert reservas['habilitadas']['operador'] is True
+
+    def test_lee_lo_guardado_aunque_la_cache_este_desactualizada(self, api):
+        Servicio.mapa()
+        _guardar('jugador', 'reservas', habilitada=False)
+
+        assert _categoria(api.get(URL_PREFERENCIAS).data, 'reservas')['habilitadas']['jugador'] is False
+
+
+@pytest.mark.django_db
+class TestActualizacionDeLaMatriz:
+    def test_varios_cambios_se_persisten_y_devuelven_la_matriz_actualizada(self, poner):
+        respuesta = poner(
+            _item('reservas', 'jugador', False),
+            _item('senas_y_cobros', 'operador', False),
+            _item('alertas_sistema', 'superadmin', False),
+        )
+
+        assert respuesta.status_code == 200
+        assert _categoria(respuesta.data, 'reservas')['habilitadas']['jugador'] is False
+        assert _categoria(respuesta.data, 'senas_y_cobros')['habilitadas']['operador'] is False
+        assert _categoria(respuesta.data, 'alertas_sistema')['habilitadas']['superadmin'] is False
+        assert _categoria(respuesta.data, 'reservas')['habilitadas']['operador'] is True
+        assert PreferenciaNotificacionRol.objects.filter(habilitada=False).count() == 3
+
+    def test_se_puede_volver_a_habilitar_lo_apagado(self, poner):
+        poner(_item('reservas', 'jugador', False))
+        respuesta = poner(_item('reservas', 'jugador', True))
+
+        assert _categoria(respuesta.data, 'reservas')['habilitadas']['jugador'] is True
+        assert PreferenciaNotificacionRol.objects.get().habilitada is True
+        assert _auditoria().count() == 2
+
+    def test_invalida_la_cache_al_confirmar(self, poner):
+        Servicio.mapa()
+        assert cache.get(CLAVE) is not None
+
+        poner(_item('reservas', 'jugador', False))
+
+        assert cache.get(CLAVE) is None
+        assert Servicio.mapa()[('jugador', 'reservas')] is False
+
+    def test_no_invalida_la_cache_antes_de_confirmar(self, api, django_capture_on_commit_callbacks):
+        Servicio.mapa()
+
+        with django_capture_on_commit_callbacks(execute=False) as pendientes:
+            api.put(URL_PREFERENCIAS, _cuerpo(_item('reservas', 'jugador', False)), format='json')
+
+        assert cache.get(CLAVE) is not None
+        assert len(pendientes) == 1
+
+    def test_reactiva_una_fila_dada_de_baja_sin_chocar_con_la_unicidad(self, poner):
+        fila = _guardar('jugador', 'reservas', habilitada=True)
+        fila.desactivar()
+
+        respuesta = poner(_item('reservas', 'jugador', False))
+
+        assert respuesta.status_code == 200
+        assert PreferenciaNotificacionRol.objects.count() == 1
+        fila.refresh_from_db()
+        assert fila.estado == EstadoRegistro.ACTIVO and fila.habilitada is False
+        assert _categoria(respuesta.data, 'reservas')['habilitadas']['jugador'] is False
+
+    def test_reactiva_una_fila_de_baja_que_tenia_el_valor_opuesto(self, poner):
+        fila = _guardar('jugador', 'reservas', habilitada=False)
+        fila.desactivar()
+
+        poner(_item('reservas', 'jugador', False))
+
+        fila.refresh_from_db()
+        assert fila.estado == EstadoRegistro.ACTIVO and fila.habilitada is False
+        assert PreferenciaNotificacionRol.objects.count() == 1
+
+    def test_pedir_el_valor_por_defecto_sobre_una_baja_no_cambia_nada(self, poner):
+        fila = _guardar('jugador', 'reservas', habilitada=False)
+        fila.desactivar()
+
+        respuesta = poner(_item('reservas', 'jugador', True))
+
+        assert respuesta.status_code == 200
+        fila.refresh_from_db()
+        assert fila.estado == EstadoRegistro.BAJA
+        assert _auditoria().count() == 0
+
+    def test_si_algo_falla_a_mitad_no_queda_ningun_cambio(self, api):
+        original = PreferenciaNotificacionRepository.crear
+        llamadas = []
+
+        def falla_en_la_segunda(*args, **kwargs):
+            llamadas.append(args)
+            if len(llamadas) == 2:
+                raise RuntimeError('falla simulada')
+            return original(*args, **kwargs)
+
+        cuerpo = _cuerpo(_item('reservas', 'jugador', False), _item('reservas', 'operador', False))
+        with mock.patch.object(PreferenciaNotificacionRepository, 'crear', side_effect=falla_en_la_segunda):
+            respuesta = api.put(URL_PREFERENCIAS, cuerpo, format='json')
+
+        assert respuesta.status_code == 500
+        assert PreferenciaNotificacionRol.objects.count() == 0
+        assert _auditoria().count() == 0
+
+    def test_una_carrera_por_la_misma_fila_responde_409_sin_dejar_cambios(self, api):
+        cuerpo = _cuerpo(_item('reservas', 'jugador', False))
+        with mock.patch.object(PreferenciaNotificacionRepository, 'crear', side_effect=IntegrityError):
+            respuesta = api.put(URL_PREFERENCIAS, cuerpo, format='json')
+
+        assert respuesta.status_code == 409
+        assert PreferenciaNotificacionRol.objects.count() == 0
+        assert _auditoria().count() == 0
+
+    def test_el_cambio_rige_de_inmediato_en_el_despacho(self, poner, node, despachar, jugador, operador):
+        poner(_item('reservas', 'jugador', False))
+
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk, operador.pk]))
+
+        assert _enviados(node)[0]['usuarios_ids'] == [operador.pk]
+
+
+@pytest.mark.django_db
+class TestIdempotenciaYAuditoria:
+    def test_mismos_valores_que_los_guardados_no_generan_auditoria_ni_filas(self, poner):
+        _guardar('jugador', 'reservas', habilitada=False)
+        Servicio.mapa()
+
+        respuesta = poner(_item('reservas', 'jugador', False))
+
+        assert respuesta.status_code == 200
+        assert PreferenciaNotificacionRol.objects.count() == 1
+        assert _auditoria().count() == 0
+        assert cache.get(CLAVE) is not None
+
+    def test_pedir_el_valor_por_defecto_sin_fila_no_crea_nada(self, poner):
+        respuesta = poner(_item('reservas', 'jugador', True), _item('contratos', 'dueno', True))
+
+        assert respuesta.status_code == 200
+        assert PreferenciaNotificacionRol.objects.count() == 0
+        assert _auditoria().count() == 0
+
+    def test_repetir_el_mismo_put_solo_audita_la_primera_vez(self, poner):
+        poner(_item('reservas', 'jugador', False))
+        poner(_item('reservas', 'jugador', False))
+
+        assert _auditoria().count() == 1
+
+    def test_solo_cuentan_los_pares_que_cambian_de_verdad(self, poner):
+        _guardar('jugador', 'reservas', habilitada=False)
+
+        poner(_item('reservas', 'jugador', False), _item('reservas', 'operador', False))
+
+        assert _auditoria().get().detalle == 'Activadas: ninguna. Desactivadas: reservas:operador.'
+
+    def test_el_registro_detalla_exactamente_que_pares_pasaron_a_cada_estado(self, poner, superadmin):
+        _guardar('dueno', 'contratos', habilitada=False)
+        _guardar('operador', 'senas_y_cobros', habilitada=False)
+
+        poner(
+            _item('senas_y_cobros', 'jugador', False),
+            _item('reservas', 'jugador', False),
+            _item('contratos', 'dueno', True),
+            _item('senas_y_cobros', 'operador', True),
+        )
+
+        registro = _auditoria().get()
+        assert registro.detalle == (
+            'Activadas: contratos:dueno, senas_y_cobros:operador. '
+            'Desactivadas: reservas:jugador, senas_y_cobros:jugador.'
+        )
+        assert registro.accion == 'Cambio de preferencias de notificaciones por rol'
+        assert registro.usuario_id == superadmin.pk
+        assert registro.complejo_id is None
+        assert registro.ip_origen == '127.0.0.1'
+
+    def test_el_evento_es_el_24_y_se_filtra_en_la_auditoria_global(self, poner, api):
+        assert TipoEventoAuditoria.CAMBIO_PREFERENCIAS_NOTIFICACIONES == 24
+        assert TipoEventoAuditoria.CAMBIO_PREFERENCIAS_NOTIFICACIONES.label == 'Cambio de preferencias de notificaciones'
+        poner(_item('reservas', 'jugador', False))
+
+        respuesta = api.get('/api/auditoria/', {'tipo_evento': 24})
+
+        assert respuesta.status_code == 200
+        assert respuesta.data['count'] == 1
+        registro = respuesta.data['results'][0]
+        assert registro['tipo_evento'] == 24
+        assert registro['tipo_evento_nombre'] == 'Cambio de preferencias de notificaciones'
+        assert registro['detalle'] == 'Activadas: ninguna. Desactivadas: reservas:jugador.'
+
+    def test_no_se_mezcla_con_los_cambios_de_configuracion_de_complejos(self, poner):
+        poner(_item('reservas', 'jugador', False))
+
+        assert LogAuditoria.objects.filter(tipo_evento=TipoEventoAuditoria.CAMBIO_CONFIGURACION).count() == 0
+
+    def test_el_registro_no_lleva_datos_personales(self, poner, superadmin, log_seguridad):
+        poner(_item('reservas', 'jugador', False))
+
+        registro = _auditoria().get()
+        for texto in (registro.detalle, registro.accion, log_seguridad.text):
+            assert superadmin.email not in texto and superadmin.nombre_completo not in texto
+
+
+@pytest.mark.django_db
+class TestValidacionDelPut:
+    @pytest.mark.parametrize('item', [
+        _item('inexistente', 'jugador', False),
+        _item('reservas', 'invitado', False),
+        _item('alertas_sistema', 'jugador', False),
+        _item('recordatorios_turno', 'operador', False),
+        _item('reservas', 'superadmin', False),
+        _item('gestion_complejo', 'operador', False),
+        {'tipo_notificacion': 'reservas', 'rol_base': 'jugador'},
+        _item('reservas', 'jugador', 'quizas'),
+        {'rol_base': 'jugador', 'habilitada': False},
+        {'tipo_notificacion': 'reservas', 'habilitada': False},
+        'reservas:jugador',
+    ])
+    def test_un_par_invalido_se_rechaza_con_400_sin_cambiar_nada(self, api, item):
+        respuesta = api.put(URL_PREFERENCIAS, _cuerpo(_item('contratos', 'dueno', False), item), format='json')
+
+        assert respuesta.status_code == 400
+        assert PreferenciaNotificacionRol.objects.count() == 0
+        assert _auditoria().count() == 0
+
+    @pytest.mark.parametrize('cuerpo', [
+        {},
+        {'preferencias': []},
+        {'preferencias': 'reservas'},
+        {'preferencias': None},
+        {'otro': []},
+    ])
+    def test_un_cuerpo_sin_lista_de_preferencias_se_rechaza(self, api, cuerpo):
+        assert api.put(URL_PREFERENCIAS, cuerpo, format='json').status_code == 400
+
+    def test_un_par_repetido_se_rechaza(self, api):
+        cuerpo = _cuerpo(_item('reservas', 'jugador', False), _item('reservas', 'jugador', True))
+
+        assert api.put(URL_PREFERENCIAS, cuerpo, format='json').status_code == 400
+        assert PreferenciaNotificacionRol.objects.count() == 0
+
+    def test_mas_pares_que_combinaciones_validas_se_rechaza(self, api):
+        items = [_item('reservas', 'jugador', False)] * 15
+
+        assert api.put(URL_PREFERENCIAS, _cuerpo(*items), format='json').status_code == 400
+
+    def test_se_aceptan_las_14_combinaciones_juntas(self, api):
+        items = [_item(tipo, rol, False) for rol, tipo in combinaciones_validas()]
+
+        respuesta = api.put(URL_PREFERENCIAS, _cuerpo(*items), format='json')
+
+        assert respuesta.status_code == 200
+        assert PreferenciaNotificacionRol.objects.filter(habilitada=False).count() == 14
+
+    def test_metodos_no_admitidos(self, api):
+        assert api.post(URL_PREFERENCIAS, {}, format='json').status_code == 405
+        assert api.patch(URL_PREFERENCIAS, {}, format='json').status_code == 405
+        assert api.delete(URL_PREFERENCIAS).status_code == 405
+
+
+@pytest.mark.django_db
+class TestPermisosDeLaMatriz:
+    def test_un_anonimo_recibe_401(self, cliente):
+        assert cliente.get(URL_PREFERENCIAS).status_code == 401
+        assert cliente.put(URL_PREFERENCIAS, _cuerpo(_item('reservas', 'jugador', False)), format='json').status_code == 401
+
+    @pytest.mark.parametrize('rol', ['jugador', 'operador', 'dueno', 'encargado'])
+    def test_el_resto_de_los_roles_recibe_403_en_get_y_put(self, request, cliente_de, rol):
+        usuario = request.getfixturevalue(rol)
+        api = cliente_de(usuario)
+
+        assert api.get(URL_PREFERENCIAS).status_code == 403
+        assert api.put(URL_PREFERENCIAS, _cuerpo(_item('reservas', 'jugador', False)), format='json').status_code == 403
+        assert PreferenciaNotificacionRol.objects.count() == 0
+
+    def test_un_rol_personalizado_no_puede_recibir_el_permiso(self, rbac):
+        rol = Rol.objects.create(nombre='Soporte')
+        permiso = Permiso.objects.get(codigo='administrar_notificaciones')
+
+        assert not RolAdminService.es_asignable(permiso)
+        assert RolPermiso.objects.filter(rol=rol, permiso=permiso).count() == 0
+
+    def test_el_superadmin_recibe_200(self, api):
+        assert api.get(URL_PREFERENCIAS).status_code == 200
+        assert api.put(URL_PREFERENCIAS, _cuerpo(_item('reservas', 'jugador', False)), format='json').status_code == 200
+
+    def test_un_acceso_denegado_queda_auditado(self, cliente_de, jugador):
+        cliente_de(jugador).get(URL_PREFERENCIAS)
+
+        assert LogAuditoria.objects.filter(tipo_evento=TipoEventoAuditoria.ACCESO_DENEGADO).count() == 1
