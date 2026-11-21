@@ -6,6 +6,7 @@ import { t } from '../i18n/index.js';
 import Alerta from './Alerta.jsx';
 import BotonAccion from './BotonAccion.jsx';
 import CampoFormulario from './CampoFormulario.jsx';
+import CampoPassword from './CampoPassword.jsx';
 
 const { limitesCampos, password: reglasPassword, cuenta } = PARAMETROS;
 
@@ -26,16 +27,19 @@ export default function FormularioRegistro({
   error,
 }) {
   const campos = { ...(error?.campos ?? {}), ...errores };
-  const campo = (nombre, id, etiqueta, propiedades = {}) => (
-    <CampoFormulario
-      id={`registro-${id}`}
-      etiqueta={etiqueta}
-      valor={valores[nombre]}
-      onCambiar={(valor) => onCambiar(nombre, valor)}
-      error={campos[nombre]}
-      {...propiedades}
-    />
-  );
+  const campo = (nombre, id, etiqueta, propiedades = {}) => {
+    const Campo = nombre === 'password' ? CampoPassword : CampoFormulario;
+    return (
+      <Campo
+        id={`registro-${id}`}
+        etiqueta={etiqueta}
+        valor={valores[nombre]}
+        onCambiar={(valor) => onCambiar(nombre, valor)}
+        error={campos[nombre]}
+        {...propiedades}
+      />
+    );
+  };
 
   return (
     <div className="mx-auto" style={{ maxWidth: '32rem' }}>
@@ -65,7 +69,6 @@ export default function FormularioRegistro({
             ayuda: t('registro.ayudaTelefono'),
           })}
           {campo('password', 'password', t('registro.password'), {
-            type: 'password',
             autoComplete: 'new-password',
             required: true,
             minLength: reglasPassword.largoMinimo,

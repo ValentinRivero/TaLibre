@@ -288,6 +288,10 @@ export const TIPO_EVENTO_AUDITORIA = Object.freeze({
   17: entrada('Cambio de catálogo', aviso),
   18: entrada('Cobro de reserva', ok),
   19: entrada('Transferencia de seña', info),
+  20: entrada('Solicitud de código de recuperación', info),
+  21: entrada('Código de recuperación bloqueado', peligro),
+  22: entrada('Contraseña restablecida con código', aviso),
+  23: entrada('Cambio de contraseña', ok),
 });
 
 export const CATEGORIA_NOTIFICACION = Object.freeze({

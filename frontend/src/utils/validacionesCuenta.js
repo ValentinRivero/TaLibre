@@ -1,7 +1,7 @@
 import { PARAMETROS } from '../config/parametros.js';
 import { t } from '../i18n/index.js';
 
-const { limitesCampos, cuenta, password: reglasPassword } = PARAMETROS;
+const { limitesCampos, cuenta, password: reglasPassword, recuperacion } = PARAMETROS;
 
 // Espejo de las reglas de Django (core/serializers.py y core/serializers_auth.py): el backend es quien las hace cumplir
 // y este módulo solo da el aviso inmediato en el formulario.
@@ -73,4 +73,74 @@ export const validarLogin = (valores) => {
     password = t('validacion.passwordLargo', { minimo: reglasPassword.largoMinimo, maximo: limitesCampos.password });
   }
   return sinValidos({ email: validarEmail(valores.email), password });
+};
+
+/** Código de verificación: exactamente los dígitos que define `PARAMETROS.recuperacion` (ya sin espacios ni letras). */
+export const validarCodigo = (valor) => {
+  if (valor === '') return obligatorio();
+  return new RegExp(`^[0-9]{${recuperacion.codigoDigitos}}$`).test(valor)
+    ? null
+    : t('validacion.codigo', { digitos: recuperacion.codigoDigitos });
+};
+
+/** La confirmación tiene que repetir exactamente la contraseña nueva. Solo se valida acá: nunca viaja al servidor. */
+export const validarConfirmacion = (nueva, confirmar) => {
+  if (confirmar === '') return obligatorio();
+  return nueva === confirmar ? null : t('validacion.passwordNoCoincide');
+};
+
+/**
+ * Contraseña nueva: las reglas de `validarPassword` y, si se conoce la actual, que sea distinta. La fortaleza de fondo
+ * (claves comunes o parecidas a los datos de la cuenta) la valida el servidor y su mensaje se muestra tal cual.
+ */
+export const validarNuevaContrasena = (nueva, actual = null) => {
+  const error = validarPassword(nueva);
+  if (error) return error;
+  return actual !== null && nueva === actual ? t('validacion.passwordIgualActual') : null;
+};
+
+/** Qué cumple hoy la contraseña nueva, para la lista de requisitos que se ve mientras se escribe. */
+export const requisitosPassword = (nueva, confirmar) => {
+  const largoValido = nueva.length >= reglasPassword.largoMinimo && nueva.length <= limitesCampos.password;
+  return [
+    {
+      clave: 'largo',
+      cumple: largoValido,
+      texto: t('contrasena.requisitoLargo', { minimo: reglasPassword.largoMinimo, maximo: limitesCampos.password }),
+    },
+    {
+      clave: 'caracteres',
+      cumple: nueva !== '' && PATRON_PASSWORD.test(nueva),
+      texto: t('contrasena.requisitoCaracteres', { simbolos: cuenta.passwordSimbolos }),
+    },
+    { clave: 'coincide', cumple: nueva !== '' && nueva === confirmar, texto: t('contrasena.requisitoCoincide') },
+  ];
+};
+
+/** Errores por campo del pedido de código (`{}` si todo es válido). */
+export const validarRecuperar = (valores) => sinValidos({ email: validarEmail(valores.email) });
+
+/** Errores por campo del restablecimiento con código. */
+export const validarRestablecer = (valores) => sinValidos({
+  email: validarEmail(valores.email),
+  codigo: validarCodigo(valores.codigo),
+  nueva_contrasena: validarNuevaContrasena(valores.nueva_contrasena),
+  confirmar_contrasena: validarConfirmacion(valores.nueva_contrasena, valores.confirmar_contrasena),
+});
+
+/**
+ * Errores por campo del cambio de contraseña con sesión. La actual solo se controla vacía o demasiado larga, como en el
+ * inicio de sesión: quien la tiene fue creada con reglas anteriores.
+ */
+export const validarCambioContrasena = (valores) => {
+  let contrasena_actual = null;
+  if (valores.contrasena_actual === '') contrasena_actual = obligatorio();
+  else if (valores.contrasena_actual.length > limitesCampos.password) {
+    contrasena_actual = t('validacion.passwordLargo', { minimo: reglasPassword.largoMinimo, maximo: limitesCampos.password });
+  }
+  return sinValidos({
+    contrasena_actual,
+    nueva_contrasena: validarNuevaContrasena(valores.nueva_contrasena, valores.contrasena_actual),
+    confirmar_contrasena: validarConfirmacion(valores.nueva_contrasena, valores.confirmar_contrasena),
+  });
 };

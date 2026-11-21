@@ -23,11 +23,33 @@ describe('tipos de evento de auditoría', () => {
     const opciones = opcionesDe(TIPO_EVENTO_AUDITORIA);
 
     expect(opciones).toContainEqual({ valor: '17', etiqueta: 'Cambio de catálogo' });
-    expect(opciones).toHaveLength(19);
+    expect(opciones).toHaveLength(23);
   });
 
-  test('cubre todos los códigos del 1 al 19 sin saltos', () => {
-    expect(Object.keys(TIPO_EVENTO_AUDITORIA).map(Number)).toEqual(Array.from({ length: 19 }, (_, i) => i + 1));
+  test('cubre todos los códigos del 1 al 23 sin saltos', () => {
+    expect(Object.keys(TIPO_EVENTO_AUDITORIA).map(Number)).toEqual(Array.from({ length: 23 }, (_, i) => i + 1));
+  });
+});
+
+describe('eventos de auditoría de contraseña', () => {
+  test.each([
+    [20, 'Solicitud de código de recuperación', 'badge-info'],
+    [21, 'Código de recuperación bloqueado', 'badge-peligro'],
+    [22, 'Contraseña restablecida con código', 'badge-aviso'],
+    [23, 'Cambio de contraseña', 'badge-ok'],
+  ])('el evento %i se muestra como «%s»', (codigo, etiqueta, badge) => {
+    expect(describir(TIPO_EVENTO_AUDITORIA, codigo)).toEqual({ etiqueta, badge });
+  });
+
+  test('el filtro de la auditoría ofrece los cuatro con su código como valor', () => {
+    const opciones = opcionesDe(TIPO_EVENTO_AUDITORIA);
+
+    expect(opciones).toContainEqual({ valor: '20', etiqueta: 'Solicitud de código de recuperación' });
+    expect(opciones).toContainEqual({ valor: '23', etiqueta: 'Cambio de contraseña' });
+  });
+
+  test('el cambio desde la cuenta y el restablecimiento con código se distinguen', () => {
+    expect(describir(TIPO_EVENTO_AUDITORIA, 23).etiqueta).not.toBe(describir(TIPO_EVENTO_AUDITORIA, 22).etiqueta);
   });
 });
 
