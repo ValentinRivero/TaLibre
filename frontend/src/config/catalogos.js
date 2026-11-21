@@ -292,6 +292,7 @@ export const TIPO_EVENTO_AUDITORIA = Object.freeze({
   21: entrada('Código de recuperación bloqueado', peligro),
   22: entrada('Contraseña restablecida con código', aviso),
   23: entrada('Cambio de contraseña', ok),
+  24: entrada('Cambio de preferencias de notificaciones', aviso),
 });
 
 export const CATEGORIA_NOTIFICACION = Object.freeze({
