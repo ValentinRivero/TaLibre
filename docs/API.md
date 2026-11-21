@@ -37,12 +37,40 @@ Referencia de los endpoints vigentes del backend principal. Todas las rutas cuel
 | `POST /api/token/` | Público | Inicio de sesión con `email` y `password`; devuelve `{ access }` y la cookie de sesión |
 | `POST /api/token/refresh/` | Cookie de sesión | Nuevo `{ access }` |
 | `POST /api/token/logout/` | Cookie de sesión | Cierra la sesión (`204`) |
+| `POST /api/auth/recuperar-contrasena/` | Público | Pide un código de verificación para restablecer la contraseña: `email`. Responde siempre `200` con el mismo mensaje |
+| `POST /api/auth/restablecer-contrasena/` | Público | Cambia la contraseña con el código recibido por correo: `email`, `codigo` (6 dígitos) y `nueva_contrasena` |
+| `POST /api/auth/cambiar-contrasena/` | Autenticado | Cambia la contraseña de la cuenta: `contrasena_actual` y `nueva_contrasena` |
 | `GET /api/perfil/` | Autenticado | Datos propios; `debe_aceptar_politica` indica si hay una versión nueva de la política |
 | `PATCH /api/perfil/` | Autenticado | `nombre_completo`, `telefono` o `acepta_politica_privacidad: true` |
 | `GET /api/perfil/baja/` | Autenticado | Vista previa de la baja: qué reservas y turnos fijos se cancelan y cuáles se conservan |
 | `DELETE /api/perfil/` | Autenticado | Baja de la cuenta propia con anonimización de datos personales (`204`) |
 
-El registro y el inicio de sesión tienen un límite de intentos por origen y responden `429` al superarlo.
+El registro, el inicio de sesión y las rutas de contraseña tienen un límite de intentos y responden `429` al superarlo. En el registro y el inicio de sesión se cuenta por origen; en el cambio de contraseña, por cuenta.
+
+### Recuperación y cambio de contraseña
+
+Las tres rutas aplican las mismas reglas de contraseña que el registro (`nueva_contrasena`: 8 a 128 caracteres, letras sin tildes ni ñ, números y los símbolos `!@#$%^&*()_+-=.,:;?/`, sin espacios) y además rechazan claves comunes, solo numéricas o parecidas a los datos de la cuenta. La confirmación de la contraseña se valida en la interfaz y no viaja a la API.
+
+**Pedir el código** (`POST /api/auth/recuperar-contrasena/`, `{ "email" }`):
+
+- Responde siempre `200` con `{ "detail": "Si el correo está registrado, enviamos un código de verificación válido por 15 minutos." }`, exista o no la cuenta, esté suspendida o dada de baja, o tenga un pedido reciente. La respuesta no permite saber si un correo está registrado.
+- Si la cuenta está activa, recibe por correo un código numérico de 6 dígitos que vence a los 15 minutos y sirve una sola vez. Un código nuevo invalida el anterior, y no se genera otro hasta pasados 60 segundos del último pedido.
+- `400` solo si el correo no tiene un formato válido; `429` al superar el límite de pedidos por origen.
+
+**Restablecer** (`POST /api/auth/restablecer-contrasena/`, `{ "email", "codigo", "nueva_contrasena" }`):
+
+- `200` con `{ "detail": "Contraseña actualizada. Ya podés iniciar sesión con la nueva." }`. El código queda usado, se cierran todas las sesiones abiertas de la cuenta y se borra la cookie de sesión del navegador.
+- Un código inexistente, incorrecto, vencido, ya usado o bloqueado, una cuenta inexistente o no activa responden el mismo `400` con `{ "error": true, "detail": "El código es inválido o expiró." }`: no se revela por qué falló.
+- Tras 5 intentos fallidos el código se invalida, aunque después llegue el correcto; hay que pedir uno nuevo.
+- Una contraseña que no cumple las reglas responde `400` con el detalle en `nueva_contrasena`; en ese caso el código no se consume ni suma intentos fallidos. El código con formato inválido (no son 6 dígitos) responde `400` con el detalle en `codigo`.
+- `429` al superar el límite de intentos por origen.
+
+**Cambiar la contraseña con la sesión abierta** (`POST /api/auth/cambiar-contrasena/`, `{ "contrasena_actual", "nueva_contrasena" }`):
+
+- `200` con `{ "detail": "Contraseña actualizada. Iniciá sesión de nuevo con la nueva." }`. Se cierran todas las sesiones, incluida la actual, se borra la cookie de sesión y se invalidan los códigos de recuperación pendientes: hay que iniciar sesión de nuevo. El access ya emitido sigue siendo válido hasta que vence.
+- `400` con el detalle en `contrasena_actual` si no es la vigente, o en `nueva_contrasena` si es igual a la actual o no cumple las reglas. `401` sin sesión y `429` al superar el límite de intentos de la cuenta.
+
+Cada solicitud de código, cada código bloqueado por intentos fallidos, cada restablecimiento y cada cambio de contraseña queda en la auditoría (tipos de evento `20` a `23`) con el identificador de la cuenta y el origen, sin el correo, el código ni la contraseña.
 
 ### Baja de la cuenta propia
 
@@ -512,7 +540,7 @@ Servicio de actividad y notificaciones, con su propia URL base. Sus errores sigu
 | `GET /api/usuarios/` | Superadmin | Cuentas; filtros `rol`, `estado`, `search` |
 | `GET /api/usuarios/<id>/` | Superadmin | Detalle |
 | `PATCH /api/usuarios/<id>/` | Superadmin | `nombre_completo`, `telefono`, `rol`, `complejo_operado`, `estado` |
-| `GET /api/auditoria/` | Superadmin | Registro de eventos de seguridad, filtrable por tipo, usuario, complejo y rango de fechas |
+| `GET /api/auditoria/` | Superadmin | Registro de eventos de seguridad, filtrable por tipo, usuario, complejo y rango de fechas. Entre los tipos: `20` solicitud de código de recuperación, `21` código bloqueado por intentos fallidos, `22` contraseña restablecida con código y `23` cambio de contraseña desde la cuenta |
 
 ### Catálogos del sistema
 

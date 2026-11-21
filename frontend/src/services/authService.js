@@ -3,8 +3,9 @@
  * `sessionStorage`, así un script inyectado no puede leerlo de ahí. El refresh viaja en una cookie HttpOnly que
  * JavaScript no ve. Al recargar la página la sesión se recupera pidiendo un access nuevo con esa cookie.
  *
- * `cierre` distingue una salida deliberada (cerrar sesión, baja de la cuenta) de una sesión que se pierde sola
- * (refresh vencido): `{ aviso }` con el texto a mostrar en la portada, o `null`. Las rutas protegidas lo usan para
+ * `cierre` distingue una salida deliberada (cerrar sesión, baja de la cuenta, cambio de contraseña) de una sesión que
+ * se pierde sola (refresh vencido): `{ aviso, ruta }` con el texto a mostrar y la pantalla a la que ir (la portada por
+ * defecto), o `null`. Las rutas protegidas lo usan para
  * ir directo a la portada y no pasar por el login.
  *
  * El estado se publica con `suscribir` y `obtenerEstado` (para `useSyncExternalStore`); cada cambio crea un objeto
@@ -78,6 +79,31 @@ export const darDeBajaCuenta = async ({ aviso = null } = {}) => {
   await apiDjango.delete('/api/perfil/');
   limpiarSesion({ aviso });
 };
+
+/**
+ * Cambia la contraseña de la cuenta con sesión. El servidor revoca todos los refresh tokens (también el de esta
+ * sesión) y borra la cookie, así que al terminar se limpia la sesión en memoria y se lleva al login con `aviso`.
+ */
+export const cambiarContrasena = async ({ contrasena_actual, nueva_contrasena }, { aviso = null } = {}) => {
+  const { data } = await apiDjango.post('/api/auth/cambiar-contrasena/', { contrasena_actual, nueva_contrasena });
+  limpiarSesion({ aviso, ruta: '/login' });
+  return data;
+};
+
+/** Pide el código de verificación. La respuesta es siempre la misma, exista o no la cuenta (anti-enumeración). */
+export const solicitarCodigoRecuperacion = async (email) => {
+  const { data } = await apiDjango.post('/api/auth/recuperar-contrasena/', { email });
+  return data;
+};
+
+/** Cambia la contraseña con el código recibido. La confirmación de la contraseña se valida en pantalla y no viaja. */
+export const restablecerContrasena = async ({ email, codigo, nueva_contrasena }) => {
+  const { data } = await apiDjango.post('/api/auth/restablecer-contrasena/', { email, codigo, nueva_contrasena });
+  return data;
+};
+
+/** Descarta la sesión en memoria sin llamar al servidor: lo usa quien ya cerró las sesiones por otra vía. */
+export const cerrarSesionLocal = () => limpiarSesion();
 
 /**
  * Recupera la sesión al abrir la app: un refresh con la cookie y, si resulta, el perfil. Sin sesión previa termina en

@@ -22,6 +22,18 @@ def cache_limpia():
     cache.clear()
 
 
+@pytest.fixture(autouse=True)
+def sin_trafico_de_correo():
+    """Ninguna prueba puede llegar al proveedor de correo: las que simulan Resend reemplazan este bloqueo."""
+    from core import email_service
+
+    with mock.patch.object(
+        email_service._abridor, 'open',
+        side_effect=AssertionError('Una prueba intentó enviar tráfico HTTP real al proveedor de correo.'),
+    ) as bloqueo:
+        yield bloqueo
+
+
 @pytest.fixture
 def cliente():
     return APIClient()

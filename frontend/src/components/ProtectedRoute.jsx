@@ -9,8 +9,8 @@ import PantallaEstado from './PantallaEstado.jsx';
 /**
  * Protege una ruta privada. Espera a que se resuelva la sesión inicial, lleva a `/login` guardando la ruta de origen
  * si no hay sesión y, con `seccion`, valida el rol contra la matriz de `catalogos.js`. Si la sesión termina estando en
- * la pantalla por una salida deliberada (cerrar sesión, baja de la cuenta), va directo a la portada con el aviso: no
- * pasa por el login ni deja esa entrada en el historial. Solo decide la navegación: el control real lo hacen los
+ * la pantalla por una salida deliberada (cerrar sesión, baja de la cuenta), va directo a la portada con el aviso (o a
+ * la ruta que indique `cierre.ruta`, como el login tras cambiar la contraseña): no deja esa entrada en el historial. Solo decide la navegación: el control real lo hacen los
  * backends (403).
  */
 export default function ProtectedRoute({ seccion, children }) {
@@ -23,7 +23,7 @@ export default function ProtectedRoute({ seccion, children }) {
   if (cargandoSesion) return <Cargando variante="pantalla" />;
   if (!autenticado) {
     if (estuvoAutenticado && cierre) {
-      return <Navigate to="/" replace state={cierre.aviso ? { aviso: cierre.aviso } : null} />;
+      return <Navigate to={cierre.ruta ?? '/'} replace state={cierre.aviso ? { aviso: cierre.aviso } : null} />;
     }
     return <Navigate to="/login" replace state={{ desde: ubicacion }} />;
   }

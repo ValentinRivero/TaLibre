@@ -10,6 +10,7 @@ import { t } from './i18n/index.js';
 import Catalogo from './pages/Catalogo.jsx';
 import Login from './pages/Login.jsx';
 import Privacidad from './pages/Privacidad.jsx';
+import RecuperarContrasena from './pages/RecuperarContrasena.jsx';
 import Registro from './pages/Registro.jsx';
 
 const ComplejoDetalle = lazy(() => import('./pages/ComplejoDetalle.jsx'));
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="/complejos/:id" element={<ComplejoDetalle />} />
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Registro />} />
+          <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
           <Route path="/privacidad" element={<Privacidad />} />
           <Route
             path="/mis-reservas"

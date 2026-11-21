@@ -142,6 +142,15 @@ export const PARAMETROS = Object.freeze({
   // Espejo de RANGO_MAXIMO_DIAS de Django y de Node (rango máximo de un reporte, en días, ambos extremos incluidos).
   reportes: Object.freeze({ rangoMaximoDias: 366 }),
   password: Object.freeze({ largoMinimo: 8 }),
+  // Espejo de LARGO_CODIGO_RECUPERACION (core/models.py) y de RECUPERACION_CODIGO_MINUTOS y
+  // RECUPERACION_ENFRIAMIENTO_SEGUNDOS de Django: dígitos del código, vida del código y espera para pedir otro.
+  // `claveEnfriamiento` es la clave de `sessionStorage` donde se recuerda, por huella del correo, cuándo se puede pedir otro código.
+  recuperacion: Object.freeze({
+    codigoDigitos: 6,
+    vigenciaMinutos: 15,
+    enfriamientoSegundos: 60,
+    claveEnfriamiento: 'talibre.enfriamientoCodigo',
+  }),
   // Espejo de LARGO_MINIMO_NOMBRE, LARGO_MINIMO_EMAIL y SIMBOLOS_PASSWORD de Django (core/models.py): reglas de los campos
   // de cuenta. El largo mínimo de la contraseña es `password.largoMinimo` y los máximos están en `limitesCampos`.
   cuenta: Object.freeze({ nombreLargoMinimo: 2, emailLargoMinimo: 6, passwordSimbolos: '!@#$%^&*()_+-=.,:;?/' }),

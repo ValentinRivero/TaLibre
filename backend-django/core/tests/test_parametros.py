@@ -26,6 +26,11 @@ VARIABLES_DE_ENTORNO = (
     'DATA_UPLOAD_MAX_MEMORY_SIZE', 'DATA_UPLOAD_MAX_NUMBER_FIELDS', 'CACHE_TIMEOUT_SEGUNDOS', 'CHANNEL_CAPACITY',
     'CHANNEL_EXPIRY_SEGUNDOS', 'CHANNEL_GROUP_EXPIRY_SEGUNDOS', 'RECORDATORIO_HORAS_ANTICIPACION',
     'RECORDATORIO_VERIFICACION_SEGUNDOS', 'REPORTE_LATENCIA_BD_MAXIMA_MS', 'ALERTA_LIMITE_VENTANA_SEGUNDOS',
+    'THROTTLE_CAMBIAR_CONTRASENA', 'THROTTLE_RECUPERAR_CONTRASENA', 'THROTTLE_RESTABLECER_CONTRASENA',
+    'RECUPERACION_CODIGO_MINUTOS',
+    'RECUPERACION_INTENTOS_MAXIMOS', 'RECUPERACION_ENFRIAMIENTO_SEGUNDOS', 'EMAIL_PROVEEDOR', 'RESEND_API_KEY',
+    'EMAIL_REMITENTE', 'EMAIL_LIMITE_DIARIO', 'EMAIL_UMBRAL_ALERTA_PCT', 'EMAIL_TIMEOUT_SEGUNDOS',
+    'EMAIL_ENVIO_EN_SEGUNDO_PLANO',
 )
 
 
@@ -65,6 +70,12 @@ ESCALARES_POR_DEFECTO = {
     'RECORDATORIO_VERIFICACION_SEGUNDOS': 300,
     'REPORTE_LATENCIA_BD_MAXIMA_MS': 500,
     'ALERTA_LIMITE_VENTANA_SEGUNDOS': 900,
+    'RECUPERACION_CODIGO_MINUTOS': 15,
+    'RECUPERACION_INTENTOS_MAXIMOS': 5,
+    'RECUPERACION_ENFRIAMIENTO_SEGUNDOS': 60,
+    'EMAIL_LIMITE_DIARIO': 100,
+    'EMAIL_UMBRAL_ALERTA_PCT': 80,
+    'EMAIL_TIMEOUT_SEGUNDOS': 8,
 }
 
 TASAS_POR_DEFECTO = {
@@ -74,6 +85,9 @@ TASAS_POR_DEFECTO = {
     'registro': '10/hour',
     'reservas': '20/hour',
     'transferencias': '10/hour',
+    'cambiar_contrasena': '10/hour',
+    'recuperar_contrasena': '5/hour',
+    'restablecer_contrasena': '10/hour',
     'grilla': '300/minute',
     'graphql': '120/minute',
 }
@@ -126,6 +140,12 @@ class TestLecturaDelEntorno:
         ('RECORDATORIO_VERIFICACION_SEGUNDOS', 60),
         ('REPORTE_LATENCIA_BD_MAXIMA_MS', 250),
         ('ALERTA_LIMITE_VENTANA_SEGUNDOS', 600),
+        ('RECUPERACION_CODIGO_MINUTOS', 10),
+        ('RECUPERACION_INTENTOS_MAXIMOS', 3),
+        ('RECUPERACION_ENFRIAMIENTO_SEGUNDOS', 120),
+        ('EMAIL_LIMITE_DIARIO', 3000),
+        ('EMAIL_UMBRAL_ALERTA_PCT', 90),
+        ('EMAIL_TIMEOUT_SEGUNDOS', 5),
     ])
     def test_parametro_escalar(self, cargar_settings, nombre, valor):
         assert getattr(cargar_settings(**{nombre: valor}), nombre) == valor
@@ -137,6 +157,9 @@ class TestLecturaDelEntorno:
         ('THROTTLE_REGISTRO', 'registro'),
         ('THROTTLE_RESERVAS', 'reservas'),
         ('THROTTLE_TRANSFERENCIAS', 'transferencias'),
+        ('THROTTLE_CAMBIAR_CONTRASENA', 'cambiar_contrasena'),
+        ('THROTTLE_RECUPERAR_CONTRASENA', 'recuperar_contrasena'),
+        ('THROTTLE_RESTABLECER_CONTRASENA', 'restablecer_contrasena'),
         ('THROTTLE_GRILLA', 'grilla'),
         ('THROTTLE_GRAPHQL', 'graphql'),
     ])
@@ -190,6 +213,15 @@ class TestValoresInvalidos:
         ('RECORDATORIO_VERIFICACION_SEGUNDOS', '0'),
         ('REPORTE_LATENCIA_BD_MAXIMA_MS', '9'),
         ('ALERTA_LIMITE_VENTANA_SEGUNDOS', '59'),
+        ('RECUPERACION_CODIGO_MINUTOS', '0'),
+        ('RECUPERACION_CODIGO_MINUTOS', '61'),
+        ('RECUPERACION_INTENTOS_MAXIMOS', '0'),
+        ('RECUPERACION_INTENTOS_MAXIMOS', '11'),
+        ('RECUPERACION_ENFRIAMIENTO_SEGUNDOS', '0'),
+        ('EMAIL_LIMITE_DIARIO', '0'),
+        ('EMAIL_UMBRAL_ALERTA_PCT', '0'),
+        ('EMAIL_UMBRAL_ALERTA_PCT', '101'),
+        ('EMAIL_TIMEOUT_SEGUNDOS', '31'),
         ('CHANNEL_CAPACITY', '0'),
         ('CHANNEL_EXPIRY_SEGUNDOS', 'abc'),
         ('CHANNEL_GROUP_EXPIRY_SEGUNDOS', '59'),
@@ -207,11 +239,37 @@ class TestValoresInvalidos:
     @pytest.mark.parametrize('variable', [
         'THROTTLE_ANON', 'THROTTLE_USER', 'THROTTLE_LOGIN', 'THROTTLE_REGISTRO',
         'THROTTLE_RESERVAS', 'THROTTLE_TRANSFERENCIAS', 'THROTTLE_GRILLA', 'THROTTLE_GRAPHQL',
+        'THROTTLE_CAMBIAR_CONTRASENA', 'THROTTLE_RECUPERAR_CONTRASENA', 'THROTTLE_RESTABLECER_CONTRASENA',
     ])
     @pytest.mark.parametrize('valor', ['cinco/minute', '0/minute', '5', '5/', '5/minuto/dia', '-3/hour', '5/Minute'])
     def test_una_tasa_con_formato_invalido_corta_el_arranque(self, cargar_settings, variable, valor):
         with pytest.raises(ImproperlyConfigured, match=variable):
             cargar_settings(**{variable: valor})
+
+
+class TestCorreo:
+    def test_valores_por_defecto(self, cargar_settings):
+        modulo = cargar_settings()
+        assert modulo.EMAIL_PROVEEDOR == 'consola'
+        assert modulo.RESEND_API_KEY == ''
+        assert modulo.EMAIL_REMITENTE == 'TaLibre <no-reply@mail.example.com>'
+        assert modulo.EMAIL_ENVIO_EN_SEGUNDO_PLANO is True
+
+    def test_resend_con_clave(self, cargar_settings):
+        modulo = cargar_settings(EMAIL_PROVEEDOR=' Resend ', RESEND_API_KEY='re_clave_ficticia')
+        assert modulo.EMAIL_PROVEEDOR == 'resend'
+        assert modulo.RESEND_API_KEY == 're_clave_ficticia'
+
+    def test_resend_sin_clave_corta_el_arranque_fuera_de_desarrollo(self, cargar_settings):
+        with pytest.raises(ImproperlyConfigured, match='RESEND_API_KEY'):
+            cargar_settings(EMAIL_PROVEEDOR='resend')
+
+    def test_resend_sin_clave_se_admite_en_desarrollo(self, cargar_settings):
+        assert cargar_settings(EMAIL_PROVEEDOR='resend', DJANGO_DEBUG='True').EMAIL_PROVEEDOR == 'resend'
+
+    def test_un_proveedor_desconocido_corta_el_arranque(self, cargar_settings):
+        with pytest.raises(ImproperlyConfigured, match='EMAIL_PROVEEDOR'):
+            cargar_settings(EMAIL_PROVEEDOR='smtp')
 
 
 class TestIdentificacionDeLaIp:

@@ -20,6 +20,24 @@ class RegistroRateThrottle(PorIpRateThrottle):
     scope = 'registro'
 
 
+class CambiarContrasenaRateThrottle(UserRateThrottle):
+    """Frena la prueba de contraseñas actuales con un access robado: se cuenta por cuenta, no por IP."""
+
+    scope = 'cambiar_contrasena'
+
+
+class RecuperarContrasenaRateThrottle(PorIpRateThrottle):
+    """Cada pedido de código puede enviar un correo, que tiene cuota diaria: se limita por IP."""
+
+    scope = 'recuperar_contrasena'
+
+
+class RestablecerContrasenaRateThrottle(PorIpRateThrottle):
+    """Frena la prueba masiva de códigos desde una IP; el tope por código lo aplica el servicio."""
+
+    scope = 'restablecer_contrasena'
+
+
 class GrillaRateThrottle(PorIpRateThrottle):
     """
     La grilla es pública y se vuelve a pedir con cada evento del WebSocket: tiene un límite propio, más amplio que

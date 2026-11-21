@@ -1,7 +1,19 @@
 import { describe, expect, test } from 'vitest';
 import { PARAMETROS } from '../config/parametros.js';
 import {
-  validarEmail, validarLogin, validarNombre, validarPassword, validarRegistro, validarTelefono,
+  requisitosPassword,
+  validarCambioContrasena,
+  validarCodigo,
+  validarConfirmacion,
+  validarEmail,
+  validarLogin,
+  validarNombre,
+  validarNuevaContrasena,
+  validarPassword,
+  validarRecuperar,
+  validarRegistro,
+  validarRestablecer,
+  validarTelefono,
 } from './validacionesCuenta.js';
 
 const { limitesCampos, cuenta } = PARAMETROS;
@@ -149,5 +161,122 @@ describe('validarLogin', () => {
     const errores = validarLogin({ email: 'jugador@talibre.test', password: 'a'.repeat(limitesCampos.password + 1) });
 
     expect(Object.keys(errores)).toEqual(['password']);
+  });
+});
+
+describe('validarCodigo', () => {
+  test('acepta exactamente seis dígitos, también con ceros a la izquierda', () => {
+    expect(validarCodigo('123456')).toBeNull();
+    expect(validarCodigo('000042')).toBeNull();
+  });
+
+  test.each(['12345', '1234567', '12345a', '12 345', '１２３４５６'])('rechaza "%s"', (codigo) => {
+    expect(validarCodigo(codigo)).toBe('Ingresá el código de 6 dígitos que te enviamos por correo.');
+  });
+
+  test('vacío pide completar el campo', () => {
+    expect(validarCodigo('')).toBe('Completá este campo.');
+  });
+});
+
+describe('validarConfirmacion', () => {
+  test('coincide solo si es idéntica, sin recortar espacios', () => {
+    expect(validarConfirmacion('ClaveNueva#1', 'ClaveNueva#1')).toBeNull();
+    expect(validarConfirmacion('ClaveNueva#1', 'clavenueva#1')).toBe('Las contraseñas no coinciden.');
+    expect(validarConfirmacion('ClaveNueva#1', 'ClaveNueva#1 ')).toBe('Las contraseñas no coinciden.');
+  });
+
+  test('vacía pide completar el campo', () => {
+    expect(validarConfirmacion('ClaveNueva#1', '')).toBe('Completá este campo.');
+  });
+});
+
+describe('validarNuevaContrasena', () => {
+  test('aplica las reglas de la contraseña', () => {
+    expect(validarNuevaContrasena('ClaveNueva#1')).toBeNull();
+    expect(validarNuevaContrasena('corta1')).toContain('entre 8 y 128');
+    expect(validarNuevaContrasena('Con espacio 1')).toContain('letras sin tildes');
+  });
+
+  test('con la actual conocida, rechaza repetirla', () => {
+    expect(validarNuevaContrasena('ClaveNueva#1', 'ClaveNueva#1')).toBe('La nueva contraseña tiene que ser distinta de la actual.');
+    expect(validarNuevaContrasena('ClaveNueva#2', 'ClaveNueva#1')).toBeNull();
+  });
+
+  test('sin la actual (restablecimiento con código) no compara', () => {
+    expect(validarNuevaContrasena('ClaveNueva#1', null)).toBeNull();
+  });
+});
+
+describe('requisitosPassword', () => {
+  const cumplidos = (nueva, confirmar) => Object.fromEntries(requisitosPassword(nueva, confirmar).map((r) => [r.clave, r.cumple]));
+
+  test('todos pendientes con los campos vacíos', () => {
+    expect(cumplidos('', '')).toEqual({ largo: false, caracteres: false, coincide: false });
+  });
+
+  test('cada requisito se evalúa por separado', () => {
+    expect(cumplidos('Corta1', '')).toEqual({ largo: false, caracteres: true, coincide: false });
+    expect(cumplidos('Con espacio 1', 'Con espacio 1')).toEqual({ largo: true, caracteres: false, coincide: true });
+    expect(cumplidos('ClaveNueva#1', 'ClaveNueva#2')).toEqual({ largo: true, caracteres: true, coincide: false });
+    expect(cumplidos('ClaveNueva#1', 'ClaveNueva#1')).toEqual({ largo: true, caracteres: true, coincide: true });
+  });
+
+  test('cada requisito trae su texto y el largo respeta el máximo', () => {
+    expect(requisitosPassword('', '').every((r) => r.texto.length > 0)).toBe(true);
+    expect(cumplidos('a'.repeat(limitesCampos.password + 1), '').largo).toBe(false);
+    expect(cumplidos('a'.repeat(limitesCampos.password), '').largo).toBe(true);
+  });
+});
+
+describe('validarRecuperar', () => {
+  test('exige un correo válido', () => {
+    expect(validarRecuperar({ email: 'jugador@example.com' })).toEqual({});
+    expect(validarRecuperar({ email: '' })).toEqual({ email: 'Completá este campo.' });
+    expect(Object.keys(validarRecuperar({ email: 'sin-arroba' }))).toEqual(['email']);
+  });
+});
+
+describe('validarRestablecer', () => {
+  const validos = {
+    email: 'jugador@example.com', codigo: '123456', nueva_contrasena: 'ClaveNueva#1', confirmar_contrasena: 'ClaveNueva#1',
+  };
+
+  test('sin errores cuando todo es válido', () => {
+    expect(validarRestablecer(validos)).toEqual({});
+  });
+
+  test('marca cada campo inválido', () => {
+    const errores = validarRestablecer({ email: '', codigo: '12', nueva_contrasena: 'corta', confirmar_contrasena: 'otra' });
+
+    expect(Object.keys(errores).sort()).toEqual(['codigo', 'confirmar_contrasena', 'email', 'nueva_contrasena']);
+  });
+
+  test('la confirmación distinta es el único error', () => {
+    expect(Object.keys(validarRestablecer({ ...validos, confirmar_contrasena: 'ClaveNueva#2' }))).toEqual(['confirmar_contrasena']);
+  });
+});
+
+describe('validarCambioContrasena', () => {
+  const validos = { contrasena_actual: 'ClaveVieja#1', nueva_contrasena: 'ClaveNueva#1', confirmar_contrasena: 'ClaveNueva#1' };
+
+  test('sin errores cuando todo es válido', () => {
+    expect(validarCambioContrasena(validos)).toEqual({});
+  });
+
+  test('la contraseña actual solo se controla vacía o demasiado larga', () => {
+    expect(validarCambioContrasena({ ...validos, contrasena_actual: '' })).toEqual({ contrasena_actual: 'Completá este campo.' });
+    expect(validarCambioContrasena({ ...validos, contrasena_actual: 'con espacio é' })).toEqual({});
+    expect(Object.keys(validarCambioContrasena({ ...validos, contrasena_actual: 'x'.repeat(limitesCampos.password + 1) }))).toEqual(['contrasena_actual']);
+  });
+
+  test('la nueva igual a la actual se rechaza', () => {
+    const errores = validarCambioContrasena({ contrasena_actual: 'ClaveVieja#1', nueva_contrasena: 'ClaveVieja#1', confirmar_contrasena: 'ClaveVieja#1' });
+
+    expect(errores).toEqual({ nueva_contrasena: 'La nueva contraseña tiene que ser distinta de la actual.' });
+  });
+
+  test('la confirmación distinta se rechaza', () => {
+    expect(Object.keys(validarCambioContrasena({ ...validos, confirmar_contrasena: 'x' }))).toEqual(['confirmar_contrasena']);
   });
 });

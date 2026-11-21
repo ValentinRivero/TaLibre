@@ -2595,3 +2595,13 @@ a {
 .banner-pwa-cerrar {
   min-width: 44px;
 }
+
+/* Campo de contraseña: el botón de ver u ocultar mantiene el área táctil mínima */
+.boton-ver-password {
+  min-width: var(--toque-min);
+}
+
+/* Requisito de contraseña cumplido: verde de texto de la marca, legible en ambos modos */
+.requisito-cumplido {
+  color: var(--tema-primario-texto);
+}

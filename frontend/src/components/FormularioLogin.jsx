@@ -6,6 +6,7 @@ import { t } from '../i18n/index.js';
 import Alerta from './Alerta.jsx';
 import BotonAccion from './BotonAccion.jsx';
 import CampoFormulario from './CampoFormulario.jsx';
+import CampoPassword from './CampoPassword.jsx';
 
 /**
  * Pantalla de inicio de sesión (presentación): el estado y el envío los maneja `pages/Login.jsx`.
@@ -35,10 +36,9 @@ export default function FormularioLogin({ valores, errores = {}, onCambiar, onEn
             onCambiar={(valor) => onCambiar('email', valor)}
             error={errores.email}
           />
-          <CampoFormulario
+          <CampoPassword
             id="login-password"
             etiqueta={t('login.password')}
-            type="password"
             autoComplete="current-password"
             required
             maxLength={PARAMETROS.limitesCampos.password}
@@ -46,7 +46,13 @@ export default function FormularioLogin({ valores, errores = {}, onCambiar, onEn
             valor={valores.password}
             onCambiar={(valor) => onCambiar('password', valor)}
             error={errores.password}
-          />
+          >
+            <div className="mt-1">
+              <Link to="/recuperar-contrasena" state={valores.email.trim() ? { email: valores.email.trim() } : undefined}>
+                {t('login.olvidaste')}
+              </Link>
+            </div>
+          </CampoPassword>
           <BotonAccion type="submit" className="w-100" cargando={enviando} textoCargando={t('login.ingresando')}>
             {t('login.enviar')}
           </BotonAccion>

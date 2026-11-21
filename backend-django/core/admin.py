@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     Cancha,
+    CodigoRecuperacionContrasena,
     Complejo,
     ComplejoServicio,
     Deporte,
@@ -50,6 +51,21 @@ class UsuarioAdmin(AdminBase):
 class LogAuditoriaAdmin(AdminBase):
     list_display = ('fecha_creacion', 'tipo_evento', 'accion', 'usuario', 'complejo', 'ip_origen')
     list_filter = ('tipo_evento',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CodigoRecuperacionContrasena)
+class CodigoRecuperacionContrasenaAdmin(AdminBase):
+    """Solo consulta: el código nunca se guarda y su firma no se muestra ni se edita."""
+
+    list_display = ('usuario', 'expira_en', 'intentos_fallidos', 'usado_en', 'invalidado_en', 'fecha_creacion')
+    list_filter = ()
+    exclude = ('codigo_hash',)
 
     def has_add_permission(self, request):
         return False

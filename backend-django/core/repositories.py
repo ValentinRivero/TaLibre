@@ -26,6 +26,7 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 from .models import (
     AlcanceExcepcion,
     Cancha,
+    CodigoRecuperacionContrasena,
     Complejo,
     ComplejoServicio,
     Deporte,
@@ -1112,6 +1113,60 @@ class SesionRepository:
             [BlacklistedToken(token=token) for token in vigentes],
             ignore_conflicts=True,
         )
+
+
+class RecuperacionContrasenaRepository:
+    @staticmethod
+    def _activos():
+        return CodigoRecuperacionContrasena.objects.filter(estado=EstadoRegistro.ACTIVO)
+
+    @staticmethod
+    def solicito_desde(usuario_id, desde):
+        """Si la cuenta pidió algún código a partir de `desde`, haya sido usado o no: es el enfriamiento entre pedidos."""
+        return RecuperacionContrasenaRepository._activos().filter(usuario_id=usuario_id, fecha_creacion__gte=desde).exists()
+
+    @staticmethod
+    def invalidar_vigentes(usuario_id, ahora):
+        return RecuperacionContrasenaRepository._activos().filter(
+            usuario_id=usuario_id, usado_en__isnull=True, invalidado_en__isnull=True,
+        ).update(invalidado_en=ahora, fecha_modificacion=ahora)
+
+    @staticmethod
+    def crear(usuario_id, codigo_hash, expira_en, ip_solicitud):
+        return CodigoRecuperacionContrasena.objects.create(
+            usuario_id=usuario_id, codigo_hash=codigo_hash, expira_en=expira_en, ip_solicitud=ip_solicitud,
+        )
+
+    @staticmethod
+    def bloquear_vigente(usuario_id, ahora):
+        """El último código sin usar, sin invalidar y sin vencer de la cuenta, bloqueado hasta cerrar la transacción."""
+        return (
+            RecuperacionContrasenaRepository._activos()
+            .select_for_update()
+            .filter(usuario_id=usuario_id, usado_en__isnull=True, invalidado_en__isnull=True, expira_en__gt=ahora)
+            .order_by('-fecha_creacion', '-id')
+            .first()
+        )
+
+    @staticmethod
+    def registrar_fallo(codigo, ahora, invalidar):
+        codigo.intentos_fallidos += 1
+        campos = ['intentos_fallidos', 'fecha_modificacion']
+        if invalidar:
+            codigo.invalidado_en = ahora
+            campos.append('invalidado_en')
+        codigo.save(update_fields=campos)
+
+    @staticmethod
+    def marcar_usado(codigo, ahora):
+        codigo.usado_en = ahora
+        codigo.save(update_fields=['usado_en', 'fecha_modificacion'])
+
+    @staticmethod
+    def anonimizar_ips_anteriores_a(limite):
+        return CodigoRecuperacionContrasena.objects.filter(
+            fecha_creacion__lt=limite, ip_solicitud__isnull=False,
+        ).update(ip_solicitud=None, fecha_modificacion=timezone.now())
 
 
 class AuditoriaRepository:
