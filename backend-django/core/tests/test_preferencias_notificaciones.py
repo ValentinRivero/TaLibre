@@ -1,12 +1,18 @@
+import ast
+import inspect
+import logging
+from datetime import date, time
 from unittest import mock
 
 import pytest
+from django.contrib import admin
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.contrib import admin
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 
+from conftest import PASSWORD_PRUEBA
+from core import services
 from core.catalogo_notificaciones import (
     CATALOGO,
     ROLES_APLICABLES,
@@ -15,7 +21,17 @@ from core.catalogo_notificaciones import (
     combinaciones_validas,
     es_combinacion_valida,
 )
-from core.models import EstadoRegistro, PreferenciaNotificacionRol, Rol, Usuario
+from core.email_service import EmailService, armar_codigo_recuperacion
+from core.models import EstadoRegistro, Permiso, PreferenciaNotificacionRol, Rol, RolPermiso, Usuario
+from core.services import (
+    CATEGORIA_AVISO_RESERVAS,
+    CATEGORIA_AVISO_SISTEMA,
+    PRIORIDAD_AVISO_NORMAL,
+    AvisoComplejoService,
+    CorreoService,
+    RecordatorioService,
+    ReservaService,
+)
 from core.services import PreferenciaNotificacionService as Servicio
 
 CLAVE = Servicio.CLAVE_CACHE
@@ -197,9 +213,9 @@ class TestMapaYCache:
         Servicio.invalidar_cache()
         assert Servicio.esta_habilitada('dueno', 'contratos') is False
 
-    def test_una_combinacion_fuera_del_catalogo_no_se_despacha(self):
-        assert Servicio.esta_habilitada('jugador', 'alertas_sistema') is False
-        assert Servicio.esta_habilitada('invitado', 'reservas') is False
+    def test_una_combinacion_sin_interruptor_se_entrega(self):
+        assert Servicio.esta_habilitada('jugador', 'alertas_sistema') is True
+        assert Servicio.esta_habilitada(None, 'reservas') is True
 
     def test_la_lectura_se_guarda_en_cache_y_no_vuelve_a_la_base(self, django_assert_num_queries):
         assert cache.get(CLAVE) is None
@@ -248,3 +264,373 @@ class TestAdmin:
         with mock.patch.object(modelo_admin, 'message_user'):
             modelo_admin.desactivar_seleccionados(pedido, PreferenciaNotificacionRol.objects.all())
         assert Servicio.mapa()[('jugador', 'reservas')] is True
+
+
+def _apagar(rol_base, tipo):
+    _guardar(rol_base, tipo, habilitada=False)
+    Servicio.invalidar_cache()
+
+
+@pytest.fixture
+def node():
+    """Cliente HTTP de backend-node reemplazado: nada sale a la red y se ven los pedidos que se habrían enviado."""
+    with mock.patch.object(services.node_client, 'enviar_notificacion') as enviar:
+        yield enviar
+
+
+@pytest.fixture
+def despachar(django_capture_on_commit_callbacks):
+    def _despachar(accion):
+        with django_capture_on_commit_callbacks(execute=True):
+            accion()
+
+    return _despachar
+
+
+@pytest.fixture
+def encargado(rbac, complejo):
+    """Usuario con un rol personalizado de un complejo: debe heredar las preferencias de `operador`."""
+    rol = Rol.objects.create(nombre='Encargado de Turno')
+    RolPermiso.objects.create(rol=rol, permiso=Permiso.objects.get(codigo='ver_agenda'))
+    return Usuario.objects.create_user(
+        email='encargado@talibre.test', password=PASSWORD_PRUEBA, rol=rol, nombre_completo='Encargado Prueba',
+        complejo_operado=complejo,
+    )
+
+
+def _enviados(node):
+    return [llamada.args[0] for llamada in node.call_args_list]
+
+
+def _a_varios(tipo, ids):
+    AvisoComplejoService.programar(
+        None, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Aviso de prueba.', tipo=tipo, usuarios_ids=ids,
+    )
+
+
+@pytest.mark.django_db
+class TestFiltroDeDespacho:
+    def test_sin_preferencias_todos_los_roles_reciben(self, node, despachar, jugador, operador, dueno):
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk, operador.pk, dueno.pk]))
+
+        assert _enviados(node)[0]['usuarios_ids'] == [jugador.pk, operador.pk, dueno.pk]
+
+    def test_un_rol_apagado_no_recibe_y_los_demas_si(self, node, despachar, jugador, operador, dueno):
+        _apagar('jugador', 'reservas')
+
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk, operador.pk, dueno.pk]))
+
+        assert node.call_count == 1
+        assert _enviados(node)[0]['usuarios_ids'] == [operador.pk, dueno.pk]
+
+    def test_apagar_un_tipo_no_afecta_a_los_otros_tipos_del_mismo_rol(self, node, despachar, jugador):
+        _apagar('jugador', 'recordatorios_turno')
+
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk]))
+
+        assert _enviados(node)[0]['usuarios_ids'] == [jugador.pk]
+
+    def test_un_aviso_a_un_usuario_apagado_no_se_envia(self, node, despachar, jugador):
+        _apagar('jugador', 'reservas')
+
+        despachar(lambda: AvisoComplejoService.al_usuario(
+            jugador, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Tu reserva id 1.', tipo=TipoNotificacion.RESERVAS,
+        ))
+
+        node.assert_not_called()
+
+    def test_un_aviso_a_un_usuario_habilitado_se_envia(self, node, despachar, jugador):
+        despachar(lambda: AvisoComplejoService.al_usuario(
+            jugador, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Tu reserva id 1.', tipo=TipoNotificacion.RESERVAS,
+        ))
+
+        assert _enviados(node)[0]['usuario_id'] == jugador.pk
+
+    def test_un_rol_personalizado_hereda_el_apagado_de_operador(self, node, despachar, encargado, dueno):
+        _apagar('operador', 'reservas')
+
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [encargado.pk, dueno.pk]))
+
+        assert _enviados(node)[0]['usuarios_ids'] == [dueno.pk]
+
+    def test_un_rol_personalizado_hereda_el_encendido_de_operador(self, node, despachar, encargado):
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [encargado.pk]))
+
+        assert _enviados(node)[0]['usuarios_ids'] == [encargado.pk]
+
+    def test_apagar_dueno_no_afecta_a_un_rol_personalizado(self, node, despachar, encargado, dueno):
+        _apagar('dueno', 'reservas')
+
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [encargado.pk, dueno.pk]))
+
+        assert _enviados(node)[0]['usuarios_ids'] == [encargado.pk]
+
+    def test_si_todos_estan_filtrados_no_hay_llamada_a_node(self, node, despachar, jugador, operador, dueno):
+        for rol in ('jugador', 'operador', 'dueno'):
+            _apagar(rol, 'reservas')
+
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk, operador.pk, dueno.pk]))
+
+        node.assert_not_called()
+
+    def test_las_alertas_de_sistema_apagadas_no_llegan_a_ningun_superadmin(self, node, despachar, superadmin):
+        _apagar('superadmin', 'alertas_sistema')
+
+        despachar(lambda: AvisoComplejoService.a_superadmins(
+            CATEGORIA_AVISO_SISTEMA, PRIORIDAD_AVISO_NORMAL, 'Alerta de prueba.', tipo=TipoNotificacion.ALERTAS_SISTEMA,
+        ))
+
+        node.assert_not_called()
+
+    def test_al_volver_a_habilitar_e_invalidar_la_cache_el_despacho_se_reanuda(self, node, despachar, jugador):
+        _apagar('jugador', 'reservas')
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk]))
+        node.assert_not_called()
+
+        PreferenciaNotificacionRol.objects.update(habilitada=True)
+        Servicio.invalidar_cache()
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk]))
+
+        assert node.call_count == 1
+        assert _enviados(node)[0]['usuarios_ids'] == [jugador.pk]
+
+    def test_sin_invalidar_la_cache_rige_la_preferencia_anterior(self, node, despachar, jugador):
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk]))
+        _guardar('jugador', 'reservas', habilitada=False)
+
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk]))
+
+        assert node.call_count == 2
+
+    def test_un_usuario_desconocido_no_se_filtra(self, node, despachar):
+        _apagar('jugador', 'reservas')
+
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [987654]))
+
+        assert _enviados(node)[0]['usuarios_ids'] == [987654]
+
+    def test_el_tipo_no_viaja_a_node(self, node, despachar, jugador):
+        despachar(lambda: _a_varios(TipoNotificacion.RESERVAS, [jugador.pk]))
+
+        assert 'tipo' not in _enviados(node)[0]
+
+    def test_un_tipo_desconocido_es_un_error_de_programacion(self, jugador):
+        with pytest.raises(ValueError):
+            _a_varios('inexistente', [jugador.pk])
+
+    def test_la_bandeja_general_de_un_complejo_no_se_filtra(self, node, despachar):
+        for rol, tipo in combinaciones_validas():
+            _guardar(rol, tipo, habilitada=False)
+        Servicio.invalidar_cache()
+
+        despachar(lambda: AvisoComplejoService.programar(
+            4, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Aviso general.', tipo=TipoNotificacion.RESERVAS,
+        ))
+
+        assert _enviados(node)[0]['complejo_id'] == 4
+
+
+@pytest.mark.django_db
+class TestFiltroConRegistroDelComplejo:
+    def test_el_personal_apagado_no_recibe_pero_el_registro_del_complejo_sale(
+        self, node, despachar, complejo, dueno, operador,
+    ):
+        _apagar('operador', 'reservas')
+
+        despachar(lambda: AvisoComplejoService.al_personal(
+            complejo, 'ver_agenda', CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'nueva reserva id 1.',
+            {'reserva': 1}, tipo=TipoNotificacion.RESERVAS,
+        ))
+
+        cuerpo = _enviados(node)[0]
+        assert cuerpo['usuarios_ids'] == [dueno.pk]
+        assert cuerpo['registro']['ambito'] == 1
+
+    def test_con_todo_el_personal_apagado_solo_queda_el_registro(self, node, despachar, complejo, dueno, operador):
+        _apagar('operador', 'reservas')
+        _apagar('dueno', 'reservas')
+
+        despachar(lambda: AvisoComplejoService.al_personal(
+            complejo, 'ver_agenda', CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'nueva reserva id 1.',
+            {'reserva': 1}, tipo=TipoNotificacion.RESERVAS,
+        ))
+
+        assert node.call_count == 1
+        cuerpo = _enviados(node)[0]
+        assert 'usuarios_ids' not in cuerpo and 'usuario_id' not in cuerpo
+        assert cuerpo['registro']['mensaje'].startswith(f'{complejo.nombre}: nueva reserva id 1.')
+
+    def test_el_evento_de_la_reserva_realizada_se_conserva_aunque_nadie_reciba_el_aviso(
+        self, node, despachar, complejo, dueno, operador,
+    ):
+        _apagar('operador', 'reservas')
+        _apagar('dueno', 'reservas')
+        evento = {'tipo_evento': 3, 'usuario_id': None, 'metadata': {'reserva_id': 1}}
+
+        despachar(lambda: AvisoComplejoService.al_personal(
+            complejo, 'ver_agenda', CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'nueva reserva id 1.',
+            tipo=TipoNotificacion.RESERVAS, evento=evento,
+        ))
+
+        assert _enviados(node)[0]['evento'] == evento
+
+    def test_el_aviso_comercial_al_dueno_apagado_conserva_su_registro(self, node, despachar, complejo, dueno):
+        _apagar('dueno', 'gestion_complejo')
+
+        despachar(lambda: AvisoComplejoService.al_dueno(
+            complejo, 'configurar_complejo', CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'se modificó el precio.',
+            tipo=TipoNotificacion.GESTION_COMPLEJO,
+        ))
+
+        cuerpo = _enviados(node)[0]
+        assert 'usuarios_ids' not in cuerpo
+        assert cuerpo['registro']['ambito'] == 2
+
+
+@pytest.mark.django_db
+class TestClasificacionDeLosDespachos:
+    def test_la_sena_registrada_depende_de_senas_y_cobros_y_no_de_reservas(
+        self, node, despachar, complejo, crear_cancha, crear_reserva, jugador,
+    ):
+        reserva = crear_reserva(crear_cancha(complejo), date(2026, 11, 20), time(18, 0), time(19, 0))
+        _apagar('jugador', 'senas_y_cobros')
+
+        despachar(lambda: ReservaService._avisar_reserva_senada(reserva))
+        node.assert_not_called()
+
+        despachar(lambda: ReservaService._avisar_reserva_confirmada(reserva))
+        assert node.call_count == 1
+
+    def test_la_confirmacion_depende_de_reservas_y_no_de_senas_y_cobros(
+        self, node, despachar, complejo, crear_cancha, crear_reserva, jugador,
+    ):
+        reserva = crear_reserva(crear_cancha(complejo), date(2026, 11, 20), time(18, 0), time(19, 0))
+        _apagar('jugador', 'reservas')
+
+        despachar(lambda: ReservaService._avisar_reserva_confirmada(reserva))
+        node.assert_not_called()
+
+        despachar(lambda: ReservaService._avisar_reserva_senada(reserva))
+        assert node.call_count == 1
+
+    def test_un_titular_afectado_por_una_excepcion_depende_de_reservas(self, node, despachar, jugador):
+        _apagar('jugador', 'reservas')
+
+        despachar(lambda: services._avisar_titulares_afectados(
+            [{'id': 7, 'usuario_id': jugador.pk}], lambda ids: 'Tu reserva fue afectada.', lambda ids: {'reservas': ids},
+        ))
+
+        node.assert_not_called()
+
+    def test_el_recordatorio_depende_de_su_propio_tipo(self, node, jugador):
+        reserva = mock.Mock(pk=5, usuario_id=jugador.pk)
+        reserva.cancha.complejo.nombre = 'Complejo Prueba'
+        reserva.cancha.nombre = 'Cancha 1'
+        reserva.fecha_turno = date(2026, 11, 17)
+        reserva.hora_inicio = time(18, 0)
+        _apagar('jugador', 'recordatorios_turno')
+
+        with mock.patch.object(RecordatorioService, '_pendientes', return_value=[reserva]):
+            assert RecordatorioService.emitir_pendientes() == 0
+            node.assert_not_called()
+
+            PreferenciaNotificacionRol.objects.filter(tipo_notificacion='recordatorios_turno').update(habilitada=True)
+            Servicio.invalidar_cache()
+            assert RecordatorioService.emitir_pendientes() == 1
+
+        assert _enviados(node)[0]['usuario_id'] == jugador.pk
+
+    def test_todo_despacho_declara_su_tipo(self):
+        """Ningún aviso nuevo puede salir sin clasificar: cada llamada al servicio de avisos pasa `tipo`."""
+        arbol = ast.parse(inspect.getsource(services))
+        metodos = {'a_superadmins', 'al_dueno', 'al_personal', 'al_usuario', 'programar', '_armar'}
+        llamadas = [
+            nodo for nodo in ast.walk(arbol)
+            if isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Attribute)
+            and isinstance(nodo.func.value, ast.Name) and nodo.func.value.id == 'AvisoComplejoService'
+            and nodo.func.attr in metodos
+        ]
+        assert len(llamadas) >= 25
+        sin_tipo = [nodo.lineno for nodo in llamadas if not any(k.arg == 'tipo' for k in nodo.keywords)]
+        assert sin_tipo == []
+
+    def test_todo_tipo_del_catalogo_tiene_al_menos_un_despacho(self):
+        fuente = inspect.getsource(services)
+        for tipo in TipoNotificacion:
+            assert f'TipoNotificacion.{tipo.name}' in fuente, tipo
+
+
+@pytest.mark.django_db
+class TestFiltroEnLote:
+    def test_un_lote_consulta_los_roles_una_sola_vez(self, crear_usuario, django_assert_num_queries):
+        usuarios = [crear_usuario(f'lote{n}@talibre.test', 'JUGADOR') for n in range(8)]
+        Servicio.mapa()
+        avisos = [
+            AvisoComplejoService._armar(
+                None, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Recordatorio.', None, usuario.pk, None, None,
+                None, tipo=TipoNotificacion.RECORDATORIOS_TURNO,
+            )
+            for usuario in usuarios
+        ]
+
+        with django_assert_num_queries(1):
+            assert len(AvisoComplejoService.filtrar_por_preferencias(avisos)) == 8
+
+    def test_un_lote_sin_destinatarios_personales_no_consulta_nada(self, django_assert_num_queries):
+        aviso = AvisoComplejoService._armar(
+            4, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'General.', None, None, None, None, None,
+            tipo=TipoNotificacion.RESERVAS,
+        )
+        with django_assert_num_queries(0):
+            assert AvisoComplejoService.filtrar_por_preferencias([aviso]) == [aviso]
+
+    def test_el_lote_descarta_solo_los_avisos_de_roles_apagados(self, jugador, operador):
+        _apagar('jugador', 'reservas')
+        avisos = [
+            AvisoComplejoService._armar(
+                None, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Aviso.', None, destino.pk, None, None, None,
+                tipo=TipoNotificacion.RESERVAS,
+            )
+            for destino in (jugador, operador)
+        ]
+
+        restantes = AvisoComplejoService.filtrar_por_preferencias(avisos)
+
+        assert [aviso['usuario_id'] for aviso in restantes] == [operador.pk]
+
+
+@pytest.mark.django_db
+class TestCorreoIndependiente:
+    @override_settings(DEBUG=True, EMAIL_PROVEEDOR='consola', EMAIL_ENVIO_EN_SEGUNDO_PLANO=False)
+    def test_el_correo_de_recuperacion_sale_con_todas_las_preferencias_apagadas(
+        self, node, django_capture_on_commit_callbacks, caplog,
+    ):
+        for rol, tipo in combinaciones_validas():
+            _guardar(rol, tipo, habilitada=False)
+        Servicio.invalidar_cache()
+        logger = logging.getLogger('core.correo')
+        logger.addHandler(caplog.handler)
+        caplog.set_level(logging.INFO, logger='core.correo')
+        try:
+            mensaje = armar_codigo_recuperacion('jugador@talibre.test', '012345', 15)
+            with django_capture_on_commit_callbacks(execute=True):
+                CorreoService.programar(mensaje)
+        finally:
+            logger.removeHandler(caplog.handler)
+
+        assert 'Para: jugador@talibre.test' in caplog.text
+        assert '012345' in caplog.text
+        node.assert_not_called()
+
+    @override_settings(DEBUG=True, EMAIL_PROVEEDOR='consola')
+    def test_el_proveedor_acepta_el_mensaje_con_todo_apagado(self):
+        for rol, tipo in combinaciones_validas():
+            _guardar(rol, tipo, habilitada=False)
+        Servicio.invalidar_cache()
+
+        assert EmailService.enviar(armar_codigo_recuperacion('jugador@talibre.test', '012345', 15)) is True
+
+    def test_el_servicio_de_correo_no_consulta_las_preferencias(self):
+        from core import email_service
+
+        assert 'preferencia' not in inspect.getsource(email_service).lower()

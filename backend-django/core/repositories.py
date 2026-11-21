@@ -143,6 +143,11 @@ class UsuarioRepository:
         return Usuario.objects.filter(estado=EstadoUsuario.ACTIVO).count()
 
     @staticmethod
+    def nombres_de_rol(usuario_ids):
+        """{usuario_id: nombre del rol} de todos los ids en una sola consulta; un id inexistente no aparece."""
+        return dict(Usuario.objects.filter(id__in=list(usuario_ids)).values_list('id', 'rol__nombre'))
+
+    @staticmethod
     def ids_activos_entre(usuario_ids):
         return sorted(Usuario.objects.filter(id__in=list(usuario_ids), estado=EstadoUsuario.ACTIVO).values_list('id', flat=True))
 

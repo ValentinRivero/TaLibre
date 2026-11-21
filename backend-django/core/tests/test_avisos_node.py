@@ -8,6 +8,7 @@ import pytest
 from rest_framework import status
 
 from core import node_client
+from core.catalogo_notificaciones import TipoNotificacion
 from core.services import (
     CATEGORIA_AVISO_RESERVAS,
     PRIORIDAD_AVISO_NORMAL,
@@ -240,7 +241,7 @@ class TestSinConfiguracion:
 class TestProgramar:
     def test_se_entrega_recien_despues_del_commit(self, node, django_capture_on_commit_callbacks):
         with django_capture_on_commit_callbacks() as pendientes:
-            AvisoComplejoService.programar(4, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Aviso de prueba.')
+            AvisoComplejoService.programar(4, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Aviso de prueba.', tipo=TipoNotificacion.RESERVAS)
             assert node.pedidos == []
 
         for callback in pendientes:
@@ -252,10 +253,11 @@ class TestProgramar:
         with django_capture_on_commit_callbacks(execute=True):
             AvisoComplejoService.programar(
                 None, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Tu reserva id 20 fue cancelada.',
-                usuario_id=31,
+                tipo=TipoNotificacion.RESERVAS, usuario_id=31,
             )
             AvisoComplejoService.programar(
-                4, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Nueva reserva id 20.', evento=evento,
+                4, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Nueva reserva id 20.', tipo=TipoNotificacion.RESERVAS,
+                evento=evento,
             )
 
         personal, del_complejo = (pedido['cuerpo'] for pedido in node.pedidos)
@@ -264,14 +266,14 @@ class TestProgramar:
 
     def test_un_mensaje_largo_se_recorta_al_maximo_de_node(self, node, django_capture_on_commit_callbacks):
         with django_capture_on_commit_callbacks(execute=True):
-            AvisoComplejoService.programar(4, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'a' * 400)
+            AvisoComplejoService.programar(4, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'a' * 400, tipo=TipoNotificacion.RESERVAS)
 
         mensaje = node.pedidos[0]['cuerpo']['mensaje']
         assert len(mensaje) == 280 and mensaje.endswith('…')
 
     def test_un_aviso_sin_destinatario_es_un_error_de_programacion(self):
         with pytest.raises(ValueError):
-            AvisoComplejoService.programar(None, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Sin destino.')
+            AvisoComplejoService.programar(None, CATEGORIA_AVISO_RESERVAS, PRIORIDAD_AVISO_NORMAL, 'Sin destino.', tipo=TipoNotificacion.RESERVAS)
 
 
 def test_lista_de_ids_resume_las_largas():
