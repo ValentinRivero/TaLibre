@@ -540,7 +540,7 @@ Servicio de actividad y notificaciones, con su propia URL base. Sus errores sigu
 | `GET /api/usuarios/` | Superadmin | Cuentas; filtros `rol`, `estado`, `search` |
 | `GET /api/usuarios/<id>/` | Superadmin | Detalle |
 | `PATCH /api/usuarios/<id>/` | Superadmin | `nombre_completo`, `telefono`, `rol`, `complejo_operado`, `estado` |
-| `GET /api/auditoria/` | Superadmin | Registro de eventos de seguridad, filtrable por tipo, usuario, complejo y rango de fechas. Entre los tipos: `20` solicitud de código de recuperación, `21` código bloqueado por intentos fallidos, `22` contraseña restablecida con código y `23` cambio de contraseña desde la cuenta |
+| `GET /api/auditoria/` | Superadmin | Registro de eventos de seguridad, filtrable por tipo, usuario, complejo y rango de fechas. Entre los tipos: `20` solicitud de código de recuperación, `21` código bloqueado por intentos fallidos, `22` contraseña restablecida con código `23` cambio de contraseña desde la cuenta y `24` cambio de preferencias de notificaciones |
 
 ### Catálogos del sistema
 
@@ -575,3 +575,52 @@ Administración de deportes, servicios y roles. Es la vista administrativa de lo
 - Respuestas de error: `400` por datos inválidos o ítem en uso, `401` sin sesión, `403` sin rol de superadmin y `404` si el id no existe.
 - Cada alta, modificación, baja o reactivación queda registrada en la auditoría con el tipo "Cambio de catálogo del sistema" (tipo de evento `17`), sin datos personales.
 
+### Preferencias de notificaciones por rol
+
+Define qué categorías de aviso interno recibe cada rol base. La matriz tiene 8 categorías y 4 roles base (`jugador`, `operador`, `dueno` y `superadmin`), con 14 combinaciones válidas: una categoría solo aplica a los roles que pueden recibirla. Sin una preferencia guardada, todo está habilitado. Un rol personalizado que recibe avisos hereda la configuración de `operador`. La configuración no afecta los correos de seguridad, como el código de recuperación de contraseña, que siempre se envían.
+
+| Método y ruta | Acceso | Uso |
+|---|---|---|
+| `GET /api/sistema/notificaciones/preferencias/` | Superadmin | La matriz completa con su estado actual |
+| `PUT /api/sistema/notificaciones/preferencias/` | Superadmin | Actualiza uno o más pares y devuelve la matriz actualizada |
+
+Respuesta de ambos métodos (`200`):
+
+```json
+{
+  "roles": [
+    { "codigo": "jugador", "nombre": "Jugador" },
+    { "codigo": "operador", "nombre": "Operador" },
+    { "codigo": "dueno", "nombre": "Dueño de complejo" },
+    { "codigo": "superadmin", "nombre": "Superadministrador" }
+  ],
+  "categorias": [
+    {
+      "codigo": "reservas",
+      "nombre": "Reservas",
+      "orden": 1,
+      "roles_aplicables": ["jugador", "operador", "dueno"],
+      "habilitadas": { "jugador": true, "operador": true, "dueno": true, "superadmin": null }
+    }
+  ]
+}
+```
+
+`categorias` viene ordenada por `orden`. En `habilitadas`, `true` y `false` indican si el rol recibe la categoría, y `null` que la combinación no existe. Los códigos de categoría son `reservas`, `recordatorios_turno`, `senas_y_cobros`, `excepciones_y_conflictos`, `gestion_complejo`, `contratos`, `cuentas_usuarios` y `alertas_sistema`.
+
+Cuerpo del `PUT`:
+
+```json
+{
+  "preferencias": [
+    { "tipo_notificacion": "reservas", "rol_base": "jugador", "habilitada": false }
+  ]
+}
+```
+
+- `preferencias` es una lista no vacía de pares, sin repetir y solo de combinaciones válidas. `habilitada` es obligatorio y booleano.
+- Un par que ya tiene el valor pedido no cambia nada. Si ningún par cambia de verdad, responde `200` sin registrar un evento de auditoría.
+- La actualización es atómica: si algún par es inválido no se guarda ninguno. El cambio rige de inmediato para los avisos nuevos.
+- Respuestas de error: `400` por un tipo o rol inexistente, una combinación que no aplica, un par repetido, `habilitada` ausente o no booleano, o una lista vacía; `401` sin sesión; `403` sin rol de superadmin; `409` si otra persona modificó las mismas preferencias al mismo tiempo (se reintenta).
+- Un cambio real queda registrado en la auditoría con el tipo "Cambio de preferencias de notificaciones" (tipo de evento `24`). El detalle lista los pares `categoría:rol` que se activaron y los que se desactivaron, sin datos personales.
+- Las entradas del registro de actividad de cada complejo se siguen generando aunque una categoría se desactive para el personal.

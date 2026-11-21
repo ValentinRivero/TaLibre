@@ -1,7 +1,10 @@
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import F, Q
+
+from .catalogo_notificaciones import RolBaseNotificacion, TipoNotificacion, es_combinacion_valida
 
 # Largos y límites que comparten el modelo y la API: se declaran una sola vez para que no se desalineen.
 LARGO_NOMBRE = 120  # personas, complejos y clientes cargados a mano
@@ -196,6 +199,7 @@ class TipoEventoAuditoria(models.IntegerChoices):
     CODIGO_RECUPERACION_BLOQUEADO = 21, 'Código de recuperación bloqueado por intentos fallidos'
     CONTRASENA_RESTABLECIDA = 22, 'Contraseña restablecida con código de recuperación'
     CAMBIO_CONTRASENA = 23, 'Cambio de contraseña desde la cuenta'
+    CAMBIO_PREFERENCIAS_NOTIFICACIONES = 24, 'Cambio de preferencias de notificaciones'
 
 
 class Rol(ModeloBase):
@@ -795,3 +799,31 @@ class CodigoRecuperacionContrasena(ModeloBase):
 
     def __str__(self):
         return f'Código de recuperación del usuario {self.usuario_id}'
+
+
+class PreferenciaNotificacionRol(ModeloBase):
+    """
+    Preferencia de la plataforma sobre un tipo de notificación para todos los usuarios de un rol base. Sin fila, o con la
+    fila dada de baja, el tipo está habilitado: la tabla solo guarda lo que el superadministrador cambia.
+    """
+
+    rol_base = models.CharField(max_length=20, choices=RolBaseNotificacion.choices)
+    tipo_notificacion = models.CharField(max_length=40, choices=TipoNotificacion.choices)
+    habilitada = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'preferencias_notificaciones_rol'
+        verbose_name = 'preferencia de notificación por rol'
+        verbose_name_plural = 'preferencias de notificaciones por rol'
+        ordering = ['tipo_notificacion', 'rol_base']
+        constraints = [
+            models.UniqueConstraint(fields=['rol_base', 'tipo_notificacion'], name='uq_preferencia_rol_tipo'),
+        ]
+
+    def __str__(self):
+        return f'{self.rol_base} / {self.tipo_notificacion}: {"habilitada" if self.habilitada else "deshabilitada"}'
+
+    def clean(self):
+        super().clean()
+        if self.rol_base and self.tipo_notificacion and not es_combinacion_valida(self.rol_base, self.tipo_notificacion):
+            raise ValidationError('Ese tipo de notificación no aplica al rol indicado.')

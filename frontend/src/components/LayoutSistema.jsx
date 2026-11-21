@@ -10,10 +10,11 @@ const SECCIONES = [
   { a: '/sistema/contratos', texto: 'sistema.contratos' },
   { a: '/sistema/deportes', texto: 'sistema.deportes' },
   { a: '/sistema/servicios', texto: 'sistema.servicios' },
+  { a: '/sistema/notificaciones', texto: 'sistema.notificaciones' },
   { a: '/sistema/auditoria', texto: 'sistema.auditoria' },
 ];
 
-/** Estructura de `/sistema/*` (superadmin): subnavegación entre cuentas, roles, contratos, deportes, servicios y auditoría, y la subvista activa. */
+/** Estructura de `/sistema/*` (superadmin): subnavegación entre cuentas, roles, contratos, deportes, servicios, notificaciones y auditoría, y la subvista activa. */
 export default function LayoutSistema() {
   const { pathname } = useLocation();
 

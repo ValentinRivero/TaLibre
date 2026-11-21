@@ -17,6 +17,7 @@ from .views import (
     PerfilBajaView,
     PerfilView,
     PermisoAdminViewSet,
+    PreferenciasNotificacionView,
     RecuperarContrasenaView,
     RefreshView,
     RegistroView,
@@ -60,6 +61,7 @@ urlpatterns = [
     path('auth/restablecer-contrasena/', RestablecerContrasenaView.as_view(), name='restablecer_contrasena'),
     path('perfil/', PerfilView.as_view(), name='perfil'),
     path('perfil/baja/', PerfilBajaView.as_view(), name='perfil_baja'),
+    path('sistema/notificaciones/preferencias/', PreferenciasNotificacionView.as_view(), name='sistema_preferencias_notificaciones'),
     path('reportes/dashboard/', ReporteDashboardView.as_view(), name='reportes_dashboard'),
     *router.urls,
 ]

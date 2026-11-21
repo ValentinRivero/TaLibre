@@ -27,6 +27,7 @@ const Roles = lazy(() => import('./pages/Roles.jsx'));
 const Contratos = lazy(() => import('./pages/Contratos.jsx'));
 const CatalogoSistema = lazy(() => import('./pages/CatalogoSistema.jsx'));
 const Auditoria = lazy(() => import('./pages/Auditoria.jsx'));
+const PreferenciasNotificacion = lazy(() => import('./pages/PreferenciasNotificacion.jsx'));
 const MisReservas = lazy(() => import('./pages/MisReservas.jsx'));
 const Perfil = lazy(() => import('./pages/Perfil.jsx'));
 const Notificaciones = lazy(() => import('./pages/Notificaciones.jsx'));
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="contratos" element={<Contratos />} />
             <Route path="deportes" element={<CatalogoSistema recurso="deportes" />} />
             <Route path="servicios" element={<CatalogoSistema recurso="servicios" />} />
+            <Route path="notificaciones" element={<PreferenciasNotificacion />} />
             <Route path="auditoria" element={<Auditoria />} />
           </Route>
         </Route>

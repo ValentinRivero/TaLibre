@@ -23,11 +23,28 @@ describe('tipos de evento de auditoría', () => {
     const opciones = opcionesDe(TIPO_EVENTO_AUDITORIA);
 
     expect(opciones).toContainEqual({ valor: '17', etiqueta: 'Cambio de catálogo' });
-    expect(opciones).toHaveLength(23);
+    expect(opciones).toHaveLength(24);
   });
 
-  test('cubre todos los códigos del 1 al 23 sin saltos', () => {
-    expect(Object.keys(TIPO_EVENTO_AUDITORIA).map(Number)).toEqual(Array.from({ length: 23 }, (_, i) => i + 1));
+  test('cubre todos los códigos del 1 al 24 sin saltos', () => {
+    expect(Object.keys(TIPO_EVENTO_AUDITORIA).map(Number)).toEqual(Array.from({ length: 24 }, (_, i) => i + 1));
+  });
+});
+
+describe('evento de auditoría de preferencias de notificaciones', () => {
+  test('el evento 24 se muestra con su etiqueta y un badge de aviso', () => {
+    expect(describir(TIPO_EVENTO_AUDITORIA, 24)).toEqual({
+      etiqueta: 'Cambio de preferencias de notificaciones',
+      badge: 'badge-aviso',
+    });
+  });
+
+  test('el filtro de la auditoría lo ofrece con su código como valor', () => {
+    expect(opcionesDe(TIPO_EVENTO_AUDITORIA)).toContainEqual({ valor: '24', etiqueta: 'Cambio de preferencias de notificaciones' });
+  });
+
+  test('el cambio de configuración del complejo (14) no se modifica', () => {
+    expect(describir(TIPO_EVENTO_AUDITORIA, 14)).toEqual({ etiqueta: 'Cambio de configuración', badge: 'badge-info' });
   });
 });
 

@@ -74,6 +74,7 @@ PERMISOS = {
     'administrar_catalogos': ('Administrar los catálogos de deportes y servicios', 'sistema'),
     'administrar_roles': ('Administrar los roles personalizados y consultar el catálogo de permisos', 'sistema'),
     'auditar_seguridad': ('Consultar la auditoría global del sistema', 'sistema'),
+    'administrar_notificaciones': ('Configurar qué notificaciones recibe cada rol', 'sistema'),
 }
 
 PERMISOS_PERFIL = [

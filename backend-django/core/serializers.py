@@ -6,6 +6,12 @@ from decimal import Decimal
 import nh3
 from rest_framework import serializers
 
+from .catalogo_notificaciones import (
+    RolBaseNotificacion,
+    TipoNotificacion,
+    combinaciones_validas,
+    es_combinacion_valida,
+)
 from .models import (
     HORAS_CANCELACION_DEFECTO,
     HORAS_CANCELACION_MAXIMAS,
@@ -415,6 +421,31 @@ class RolAdminSerializer(serializers.Serializer):
 
     def get_es_base(self, rol):
         return rol.nombre in ROLES_BASE
+
+
+class PreferenciaNotificacionSerializer(serializers.Serializer):
+    """Un interruptor de la matriz: un tipo de notificación para un rol base. Rechaza las combinaciones fuera del catálogo."""
+
+    tipo_notificacion = serializers.ChoiceField(choices=TipoNotificacion.choices)
+    rol_base = serializers.ChoiceField(choices=RolBaseNotificacion.choices)
+    habilitada = serializers.BooleanField()
+
+    def validate(self, attrs):
+        if not es_combinacion_valida(attrs['rol_base'], attrs['tipo_notificacion']):
+            raise serializers.ValidationError('Ese tipo de notificación no aplica al rol indicado.')
+        return attrs
+
+
+class PreferenciasNotificacionSerializer(serializers.Serializer):
+    preferencias = PreferenciaNotificacionSerializer(
+        many=True, allow_empty=False, max_length=len(combinaciones_validas()),
+    )
+
+    def validate_preferencias(self, preferencias):
+        pares = [(item['rol_base'], item['tipo_notificacion']) for item in preferencias]
+        if len(pares) != len(set(pares)):
+            raise serializers.ValidationError('Cada combinación de rol y tipo puede aparecer una sola vez.')
+        return preferencias
 
 
 class RolAltaSerializer(serializers.Serializer):

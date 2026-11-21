@@ -17,6 +17,7 @@ GESTION_DEL_DUENO = {
 SISTEMA = {
     'ver_panel_sistema', 'ver_contratos', 'administrar_contratos', 'ver_usuarios', 'editar_usuarios',
     'desactivar_usuarios', 'administrar_catalogos', 'administrar_roles', 'auditar_seguridad',
+    'administrar_notificaciones',
 }
 TODOS = PERFIL | RESERVAS_PROPIAS | OPERATORIA | GESTION_DEL_DUENO | SISTEMA
 
@@ -29,9 +30,9 @@ MATRIZ = {
 
 
 class TestMatrizRBAC:
-    def test_el_catalogo_tiene_los_31_permisos(self, rbac):
+    def test_el_catalogo_tiene_los_32_permisos(self, rbac):
         assert set(Permiso.objects.values_list('codigo', flat=True)) == TODOS
-        assert len(TODOS) == 31
+        assert len(TODOS) == 32
 
     @pytest.mark.parametrize('fixture_usuario', list(MATRIZ))
     def test_cada_rol_tiene_exactamente_sus_permisos(self, request, fixture_usuario):
