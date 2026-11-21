@@ -34,6 +34,17 @@ RECORDATORIO_VERIFICACION_SEGUNDOS = 300
 REPORTE_LATENCIA_BD_MAXIMA_MS = 500
 ALERTA_LIMITE_VENTANA_SEGUNDOS = 900
 CATALOGO_MARCADORES_MAXIMO = 500
+RECUPERACION_CODIGO_MINUTOS = 15
+RECUPERACION_INTENTOS_MAXIMOS = 5
+RECUPERACION_ENFRIAMIENTO_SEGUNDOS = 60
+# Nunca sale tráfico real: el proveedor de las pruebas es la consola y la entrega es en el mismo hilo.
+EMAIL_PROVEEDOR = 'consola'
+RESEND_API_KEY = ''
+EMAIL_REMITENTE = 'TaLibre <no-reply@mail.example.com>'
+EMAIL_LIMITE_DIARIO = 100
+EMAIL_UMBRAL_ALERTA_PCT = 80
+EMAIL_TIMEOUT_SEGUNDOS = 8
+EMAIL_ENVIO_EN_SEGUNDO_PLANO = False
 # Las pruebas hablan HTTP plano con el cliente de Django: la redirección a HTTPS es de producción.
 SECURE_SSL_REDIRECT = False
 REST_FRAMEWORK = {
@@ -44,6 +55,8 @@ REST_FRAMEWORK = {
         'login': '5/minute',
         'reservas': '20/hour',
         'transferencias': '10/hour',
+        'recuperar_contrasena': '5/hour',
+        'restablecer_contrasena': '10/hour',
         'grilla': '300/minute',
     },
 }

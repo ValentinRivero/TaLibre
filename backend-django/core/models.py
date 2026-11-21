@@ -35,6 +35,8 @@ LARGO_PAGADOR_TRANSFERENCIA = 100
 LARGO_MINIMO_REFERENCIA = 3  # solo se aplica en la API
 LARGO_REFERENCIA_TRANSFERENCIA = 60
 LARGO_NOTA_RECHAZO = 120  # nota opcional del personal al rechazar una transferencia informada
+LARGO_CODIGO_RECUPERACION = 6  # dígitos del código de verificación que se envía por correo
+LARGO_HASH_CODIGO = 64  # HMAC-SHA256 en hexadecimal
 
 
 class EstadoRegistro(models.IntegerChoices):
@@ -190,6 +192,9 @@ class TipoEventoAuditoria(models.IntegerChoices):
     CAMBIO_CATALOGO = 17, 'Cambio de catálogo del sistema'
     RESERVA_PAGO = 18, 'Cobro de reserva'
     TRANSFERENCIA_INFORMADA = 19, 'Transferencia de seña'  # informada, corregida o rechazada
+    SOLICITUD_CODIGO_RECUPERACION = 20, 'Solicitud de código de recuperación de contraseña'
+    CODIGO_RECUPERACION_BLOQUEADO = 21, 'Código de recuperación bloqueado por intentos fallidos'
+    CONTRASENA_RESTABLECIDA = 22, 'Contraseña restablecida con código de recuperación'
 
 
 class Rol(ModeloBase):
@@ -762,3 +767,30 @@ class LogAuditoria(ModeloBase):
 
     def __str__(self):
         return f'[{self.get_tipo_evento_display()}] {self.accion}'
+
+
+class CodigoRecuperacionContrasena(ModeloBase):
+    """
+    Código numérico de un solo uso para restablecer la contraseña. Nunca se guarda el código: solo su HMAC-SHA256,
+    firmado con la clave del servidor porque con 10^6 combinaciones un hash sin clave se revierte en segundos.
+    """
+
+    usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='codigos_recuperacion')
+    codigo_hash = models.CharField(max_length=LARGO_HASH_CODIGO, db_index=True)
+    expira_en = models.DateTimeField()
+    intentos_fallidos = models.PositiveSmallIntegerField(default=0)
+    usado_en = models.DateTimeField(null=True, blank=True)
+    invalidado_en = models.DateTimeField(null=True, blank=True)
+    ip_solicitud = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'codigos_recuperacion_contrasena'
+        verbose_name = 'código de recuperación de contraseña'
+        verbose_name_plural = 'códigos de recuperación de contraseña'
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['usuario', 'fecha_creacion'], name='idx_codrec_usuario_fecha'),
+        ]
+
+    def __str__(self):
+        return f'Código de recuperación del usuario {self.usuario_id}'

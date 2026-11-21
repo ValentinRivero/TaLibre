@@ -1,9 +1,11 @@
 import asyncio
 import calendar
 import hashlib
+import hmac
 import ipaddress
 import logging
 import re
+import secrets
 import threading
 import time as time_module
 from collections import defaultdict
@@ -13,8 +15,9 @@ from decimal import ROUND_HALF_UP, Decimal
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, password_validation
 from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed, NotFound, PermissionDenied, ValidationError
@@ -24,9 +27,11 @@ from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from . import node_client
+from .email_service import EmailService, armar_codigo_recuperacion
 from .exceptions import ConflictoConConfirmacion, ConflictoNegocio, ServicioNoDisponible
 from .models import (
     LARGO_ACCION_AUDITORIA,
+    LARGO_CODIGO_RECUPERACION,
     AlcanceExcepcion,
     DiaSemana,
     EstadoCancha,
@@ -53,6 +58,7 @@ from .repositories import (
     GrillaRepository,
     HorarioAperturaRepository,
     PermisoRepository,
+    RecuperacionContrasenaRepository,
     ReporteRepository,
     ReservaRepository,
     RolAdminRepository,
@@ -64,6 +70,7 @@ from .repositories import (
 )
 
 logger_seguridad = logging.getLogger('seguridad')
+logger_correo = logging.getLogger('core.correo')
 
 ROL_SUPERADMIN = 'SUPERADMIN'
 ROL_DUENO = 'DUENO_COMPLEJO'
@@ -337,6 +344,7 @@ class AuditoriaService:
         """
         corte = _sumar_meses(timezone.localdate(), -settings.AUDITORIA_RETENCION_MESES)
         limite = datetime.combine(corte, time.min, tzinfo=timezone.get_current_timezone())
+        RecuperacionContrasenaRepository.anonimizar_ips_anteriores_a(limite)
         return AuditoriaRepository.anonimizar_ips_anteriores_a(limite)
 
 
@@ -543,6 +551,145 @@ class UsuarioService:
             detalle=f'Baja solicitada por el titular: datos personales anonimizados y sesiones revocadas. {resumen}',
             usuario=usuario, ip_origen=ip_origen,
         )
+
+
+MENSAJE_CODIGO_INVALIDO = 'El código es inválido o expiró.'
+MENSAJE_CONTRASENA_RESTABLECIDA = 'Contraseña actualizada. Ya podés iniciar sesión con la nueva.'
+
+
+def mensaje_solicitud_de_codigo():
+    return (
+        'Si el correo está registrado, enviamos un código de verificación válido por '
+        f'{settings.RECUPERACION_CODIGO_MINUTOS} minutos.'
+    )
+
+
+class CorreoService:
+    """
+    Entrega de correos de la aplicación: la cuenta del día, el aviso de cuota a los superadministradores y el envío por
+    el proveedor configurado. Siempre después del commit y nunca revierte la operación que lo originó.
+    """
+
+    @staticmethod
+    def programar(mensaje):
+        transaction.on_commit(lambda: CorreoService._despachar(mensaje), robust=True)
+
+    @staticmethod
+    def _despachar(mensaje):
+        cupo = EmailService.reservar_cupo()
+        if cupo.alerta_pendiente:
+            CorreoService._alertar_cuota(cupo)
+        if not cupo.permitido:
+            logger_correo.warning(
+                'Se alcanzó el límite diario de correos (%s): el correo "%s" no se envió. Se reanuda mañana.',
+                cupo.limite, mensaje.asunto,
+            )
+            return
+        if settings.EMAIL_ENVIO_EN_SEGUNDO_PLANO:
+            threading.Thread(target=EmailService.enviar, args=(mensaje,), name='correo', daemon=True).start()
+        else:
+            EmailService.enviar(mensaje)
+
+    @staticmethod
+    def _alertar_cuota(cupo):
+        """Un único aviso urgente por día, en el primer envío que alcanza el umbral. Sin datos personales."""
+        porcentaje = round(cupo.consumo * 100 / cupo.limite)
+        try:
+            AvisoComplejoService.a_superadmins(
+                CATEGORIA_AVISO_SISTEMA, PRIORIDAD_AVISO_URGENTE,
+                f'Alerta de correo: hoy se usaron {cupo.consumo} de {cupo.limite} envíos diarios ({porcentaje}%). '
+                'Al llegar al límite se dejan de enviar los códigos de recuperación de contraseña hasta mañana.',
+                clave_unica=f'cuota-correo-{timezone.localdate().isoformat()}',
+            )
+        except DatabaseError:
+            logger_correo.exception('No se pudo avisar a los superadministradores de la cuota de correo')
+
+
+def _firmar_codigo(usuario_id, codigo):
+    """
+    HMAC-SHA256 con la clave del servidor. Con solo 10^6 combinaciones, un hash sin clave se revertiría probando todas:
+    firmarlo obliga a tener también SECRET_KEY, y atarlo al usuario impide reutilizar la firma de otra cuenta.
+    """
+    return hmac.new(settings.SECRET_KEY.encode(), f'{usuario_id}:{codigo}'.encode(), hashlib.sha256).hexdigest()
+
+
+class RecuperacionContrasenaService:
+    """
+    Restablecimiento de contraseña con código numérico de un solo uso enviado al correo de la cuenta. No distingue
+    cuentas existentes de inexistentes: las dos respuestas públicas son siempre las mismas. La auditoría identifica a la
+    cuenta por su id y nunca guarda el correo, el código ni la contraseña.
+    """
+
+    @staticmethod
+    def solicitar_codigo(email, ip_origen):
+        with transaction.atomic():
+            # Bloquear la cuenta serializa los pedidos simultáneos: el enfriamiento no se evade con dos peticiones a la vez.
+            usuario = UsuarioRepository.bloquear_por_email(email)
+            if usuario is None or usuario.estado != EstadoUsuario.ACTIVO:
+                return
+            ahora = timezone.now()
+            enfriamiento = timedelta(seconds=settings.RECUPERACION_ENFRIAMIENTO_SEGUNDOS)
+            if RecuperacionContrasenaRepository.solicito_desde(usuario.pk, ahora - enfriamiento):
+                return
+            if EmailService.cupo_agotado():
+                logger_correo.warning('Límite diario de correos alcanzado: no se generó un código de recuperación.')
+                return
+
+            RecuperacionContrasenaRepository.invalidar_vigentes(usuario.pk, ahora)
+            codigo = f'{secrets.randbelow(10 ** LARGO_CODIGO_RECUPERACION):0{LARGO_CODIGO_RECUPERACION}d}'
+            RecuperacionContrasenaRepository.crear(
+                usuario.pk, _firmar_codigo(usuario.pk, codigo),
+                ahora + timedelta(minutes=settings.RECUPERACION_CODIGO_MINUTOS), ip_origen,
+            )
+            AuditoriaService.registrar(
+                TipoEventoAuditoria.SOLICITUD_CODIGO_RECUPERACION, 'Solicitud de código de recuperación',
+                detalle=f'Código generado con vigencia de {settings.RECUPERACION_CODIGO_MINUTOS} minutos.',
+                usuario=usuario, ip_origen=ip_origen,
+            )
+            CorreoService.programar(armar_codigo_recuperacion(
+                usuario.email, codigo, settings.RECUPERACION_CODIGO_MINUTOS,
+            ))
+
+    @staticmethod
+    def _validar_contrasena(usuario, contrasena):
+        try:
+            password_validation.validate_password(contrasena, user=usuario)
+        except DjangoValidationError as error:
+            raise ValidationError({'nueva_contrasena': list(error.messages)}) from None
+
+    @staticmethod
+    def restablecer(email, codigo, nueva_contrasena, ip_origen):
+        ahora = timezone.now()
+        with transaction.atomic():
+            usuario = UsuarioRepository.bloquear_por_email(email)
+            activa = usuario is not None and usuario.estado == EstadoUsuario.ACTIVO
+            registro = RecuperacionContrasenaRepository.bloquear_vigente(usuario.pk, ahora) if activa else None
+            # La firma se calcula siempre, exista o no la cuenta, para no dar pistas por el tiempo de respuesta.
+            firma = _firmar_codigo(usuario.pk if activa else 0, codigo)
+
+            if registro is not None and hmac.compare_digest(registro.codigo_hash, firma):
+                RecuperacionContrasenaService._validar_contrasena(usuario, nueva_contrasena)
+                usuario.set_password(nueva_contrasena)
+                UsuarioRepository.actualizar(usuario, password=usuario.password)
+                RecuperacionContrasenaRepository.marcar_usado(registro, ahora)
+                SesionRepository.revocar_refresh_de_usuario(usuario.pk)
+                AuditoriaService.registrar(
+                    TipoEventoAuditoria.CONTRASENA_RESTABLECIDA, 'Contraseña restablecida con código',
+                    detalle='Contraseña cambiada y sesiones abiertas revocadas.', usuario=usuario, ip_origen=ip_origen,
+                )
+                return
+
+            if registro is not None:
+                # El fallo se guarda antes de rechazar: lanzar dentro del bloque lo revertiría y no habría tope.
+                bloqueado = registro.intentos_fallidos + 1 >= settings.RECUPERACION_INTENTOS_MAXIMOS
+                RecuperacionContrasenaRepository.registrar_fallo(registro, ahora, invalidar=bloqueado)
+                if bloqueado:
+                    AuditoriaService.registrar(
+                        TipoEventoAuditoria.CODIGO_RECUPERACION_BLOQUEADO, 'Código de recuperación bloqueado',
+                        detalle=f'Código invalidado tras {settings.RECUPERACION_INTENTOS_MAXIMOS} intentos fallidos.',
+                        usuario=usuario, ip_origen=ip_origen,
+                    )
+        raise ValidationError(MENSAJE_CODIGO_INVALIDO)
 
 
 def _campos_modificados(instancia, datos):

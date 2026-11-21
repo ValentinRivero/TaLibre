@@ -9,6 +9,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import (
     LARGO_EMAIL,
     LARGO_MAXIMO_PASSWORD,
+    LARGO_CODIGO_RECUPERACION,
     LARGO_MINIMO_EMAIL,
     LARGO_NOMBRE,
     LARGO_TELEFONO,
@@ -28,6 +29,13 @@ MENSAJE_PASSWORD = (
     f'La contraseña solo puede tener letras sin tildes ni ñ, números y estos símbolos: {SIMBOLOS_PASSWORD} '
     '(sin espacios ni emojis).'
 )
+
+
+def _email_normalizado(valor):
+    email = valor.strip().lower()
+    if len(email) < LARGO_MINIMO_EMAIL or '.' not in email.rpartition('@')[2]:
+        raise serializers.ValidationError(MENSAJE_EMAIL)
+    return email
 
 
 def _validar_aceptacion(valor):
@@ -57,9 +65,7 @@ class RegistroSerializer(serializers.Serializer):
     )
 
     def validate_email(self, valor):
-        email = valor.strip().lower()
-        if len(email) < LARGO_MINIMO_EMAIL or '.' not in email.rpartition('@')[2]:
-            raise serializers.ValidationError(MENSAJE_EMAIL)
+        email = _email_normalizado(valor)
         if UsuarioRepository.existe_email(email):
             raise serializers.ValidationError('Ya existe una cuenta registrada con ese email.')
         return email
@@ -90,6 +96,32 @@ class LoginSerializer(serializers.Serializer):
 
     def validate_email(self, valor):
         return valor.strip().lower()
+
+
+class RecuperarContrasenaSerializer(serializers.Serializer):
+    """Solo valida el formato: si la cuenta existe no se consulta acá, para no distinguirlo en la respuesta."""
+
+    email = serializers.EmailField(max_length=LARGO_EMAIL)
+
+    def validate_email(self, valor):
+        return _email_normalizado(valor)
+
+
+class RestablecerContrasenaSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=LARGO_EMAIL)
+    codigo = serializers.RegexField(
+        rf'^[0-9]{{{LARGO_CODIGO_RECUPERACION}}}$',
+        error_messages={'invalid': f'El código tiene {LARGO_CODIGO_RECUPERACION} dígitos.'},
+    )
+    nueva_contrasena = serializers.CharField(write_only=True, trim_whitespace=False, max_length=LARGO_MAXIMO_PASSWORD)
+
+    def validate_email(self, valor):
+        return _email_normalizado(valor)
+
+    def validate_nueva_contrasena(self, valor):
+        if not PATRON_PASSWORD.match(valor):
+            raise serializers.ValidationError(MENSAJE_PASSWORD)
+        return valor
 
 
 class PerfilSerializer(serializers.ModelSerializer):

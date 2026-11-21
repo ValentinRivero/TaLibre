@@ -203,6 +203,8 @@ REST_FRAMEWORK = {
         'registro': _env_tasa('THROTTLE_REGISTRO', '10/hour'),
         'reservas': _env_tasa('THROTTLE_RESERVAS', '20/hour'),
         'transferencias': _env_tasa('THROTTLE_TRANSFERENCIAS', '10/hour'),
+        'recuperar_contrasena': _env_tasa('THROTTLE_RECUPERAR_CONTRASENA', '5/hour'),
+        'restablecer_contrasena': _env_tasa('THROTTLE_RESTABLECER_CONTRASENA', '10/hour'),
         'grilla': _env_tasa('THROTTLE_GRILLA', '300/minute'),
         'graphql': _env_tasa('THROTTLE_GRAPHQL', '120/minute'),
     },
@@ -277,6 +279,27 @@ CATALOGO_MARCADORES_MAXIMO = _env_entero('CATALOGO_MARCADORES_MAXIMO', 500, mini
 DATA_UPLOAD_MAX_MEMORY_SIZE = _env_entero('DATA_UPLOAD_MAX_MEMORY_SIZE', 2_621_440, minimo=1024)
 DATA_UPLOAD_MAX_NUMBER_FIELDS = _env_entero('DATA_UPLOAD_MAX_NUMBER_FIELDS', 1000, minimo=10)
 CACHE_TIMEOUT_SEGUNDOS = _env_entero('CACHE_TIMEOUT_SEGUNDOS', 300, minimo=1)
+
+# Recuperación de contraseña por código numérico: vida del código, fallos tolerados antes de invalidarlo y segundos
+# que debe esperar una cuenta para pedir otro.
+RECUPERACION_CODIGO_MINUTOS = _env_entero('RECUPERACION_CODIGO_MINUTOS', 15, minimo=1, maximo=60)
+RECUPERACION_INTENTOS_MAXIMOS = _env_entero('RECUPERACION_INTENTOS_MAXIMOS', 5, minimo=1, maximo=10)
+RECUPERACION_ENFRIAMIENTO_SEGUNDOS = _env_entero('RECUPERACION_ENFRIAMIENTO_SEGUNDOS', 60, minimo=1, maximo=3600)
+
+# Correo transaccional. `consola` no envía nada: muestra el mensaje solo con DJANGO_DEBUG; `resend` usa su API HTTP.
+EMAIL_PROVEEDOR = (os.environ.get('EMAIL_PROVEEDOR') or 'consola').strip().lower()
+if EMAIL_PROVEEDOR not in ('consola', 'resend'):
+    raise ImproperlyConfigured('EMAIL_PROVEEDOR debe ser consola o resend.')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip()
+if EMAIL_PROVEEDOR == 'resend' and not RESEND_API_KEY and not DEBUG:
+    raise ImproperlyConfigured('EMAIL_PROVEEDOR=resend exige definir RESEND_API_KEY.')
+EMAIL_REMITENTE = (os.environ.get('EMAIL_REMITENTE') or 'TaLibre <no-reply@mail.example.com>').strip()
+# Correos por día calendario que admite el plan del proveedor y porcentaje desde el que se avisa a los superadministradores.
+EMAIL_LIMITE_DIARIO = _env_entero('EMAIL_LIMITE_DIARIO', 100, minimo=1, maximo=1_000_000)
+EMAIL_UMBRAL_ALERTA_PCT = _env_entero('EMAIL_UMBRAL_ALERTA_PCT', 80, minimo=1, maximo=100)
+EMAIL_TIMEOUT_SEGUNDOS = _env_entero('EMAIL_TIMEOUT_SEGUNDOS', 8, minimo=1, maximo=30)
+# La entrega sale en un hilo aparte para que la respuesta tarde lo mismo exista o no la cuenta (anti-enumeración).
+EMAIL_ENVIO_EN_SEGUNDO_PLANO = _env_bool('EMAIL_ENVIO_EN_SEGUNDO_PLANO', True)
 
 _CONFIG_CANAL = {
     'capacity': _env_entero('CHANNEL_CAPACITY', 100, minimo=1),
@@ -382,6 +405,12 @@ LOGGING = {
         'django': {
             'handlers': ['consola'],
             'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
+        },
+        # Correo transaccional: en desarrollo muestra el mensaje y siempre registra las fallas del proveedor.
+        'core.correo': {
+            'handlers': ['consola'],
+            'level': 'INFO',
+            'propagate': False,
         },
         # Fallas operativas del núcleo que no son de seguridad, como un channel layer caído.
         'core': {

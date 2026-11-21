@@ -71,7 +71,14 @@ from .serializers import (
     UsuarioAdminSerializer,
     VincularOperadorSerializer,
 )
-from .serializers_auth import LoginSerializer, PerfilEdicionSerializer, PerfilSerializer, RegistroSerializer
+from .serializers_auth import (
+    LoginSerializer,
+    PerfilEdicionSerializer,
+    PerfilSerializer,
+    RecuperarContrasenaSerializer,
+    RegistroSerializer,
+    RestablecerContrasenaSerializer,
+)
 from .services import (
     AccesoComplejoService,
     AuditoriaService,
@@ -88,6 +95,7 @@ from .services import (
     OperadorService,
     RbacService,
     RecordatorioService,
+    RecuperacionContrasenaService,
     ReporteService,
     ReservaService,
     RolAdminService,
@@ -96,11 +104,15 @@ from .services import (
     TurnoFijoService,
     UsuarioAdminService,
     UsuarioService,
+    MENSAJE_CONTRASENA_RESTABLECIDA,
+    mensaje_solicitud_de_codigo,
 )
 from .throttles import (
     GrillaRateThrottle,
     LoginRateThrottle,
+    RecuperarContrasenaRateThrottle,
     RegistroRateThrottle,
+    RestablecerContrasenaRateThrottle,
     ReservaRateThrottle,
     TransferenciaRateThrottle,
 )
@@ -188,6 +200,36 @@ class LogoutView(VistaPublica):
             AuditoriaService.ip_de_request(request),
         )
         respuesta = Response(status=status.HTTP_204_NO_CONTENT)
+        _borrar_cookie_refresh(respuesta)
+        return respuesta
+
+
+class RecuperarContrasenaView(VistaPublica):
+    """Siempre 200 con el mismo mensaje: exista o no la cuenta, esté activa o tenga un pedido reciente."""
+
+    throttle_classes = [RecuperarContrasenaRateThrottle]
+
+    def post(self, request):
+        serializer = RecuperarContrasenaSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        RecuperacionContrasenaService.solicitar_codigo(
+            serializer.validated_data['email'], AuditoriaService.ip_de_request(request),
+        )
+        return Response({'detail': mensaje_solicitud_de_codigo()})
+
+
+class RestablecerContrasenaView(VistaPublica):
+    throttle_classes = [RestablecerContrasenaRateThrottle]
+
+    def post(self, request):
+        serializer = RestablecerContrasenaSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        datos = serializer.validated_data
+        RecuperacionContrasenaService.restablecer(
+            datos['email'], datos['codigo'], datos['nueva_contrasena'], AuditoriaService.ip_de_request(request),
+        )
+        respuesta = Response({'detail': MENSAJE_CONTRASENA_RESTABLECIDA})
+        # Si este navegador tenía una sesión, su refresh ya quedó revocado: se descarta la cookie.
         _borrar_cookie_refresh(respuesta)
         return respuesta
 
