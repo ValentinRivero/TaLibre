@@ -1404,8 +1404,11 @@ class CanchaService:
             raise ValidationError({'nombre': MENSAJE_NOMBRE_CANCHA_REPETIDO})
 
     @staticmethod
-    def dar_de_baja(cancha):
-        """Sin confirmación posible: una cancha con ocupación futura primero se libera desde la agenda."""
+    def dar_de_baja(cancha, actor=None, ip_origen=None):
+        """
+        Sin confirmación posible: una cancha con ocupación futura primero se libera desde la agenda. Se audita solo
+        la baja concretada: si hay ocupación vigente, el 400 corta antes de registrar nada.
+        """
         with transaction.atomic():
             CanchaRepository.bloquear(cancha.pk)
             if CanchaRepository.tiene_ocupacion_futura(cancha.pk, timezone.localdate()):
@@ -1415,6 +1418,12 @@ class CanchaService:
                 )
             cancha.desactivar()
             DifusionGrillaService.programar_operatoria(cancha.complejo_id, cancha.pk)
+
+        AuditoriaService.registrar(
+            TipoEventoAuditoria.CAMBIO_CONFIGURACION, 'Baja de cancha',
+            detalle=f'Cancha id {cancha.pk} «{cancha.nombre}».',
+            usuario=actor, complejo=cancha.complejo_id, ip_origen=ip_origen,
+        )
 
 
 class HorarioAperturaService:
