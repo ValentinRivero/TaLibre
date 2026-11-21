@@ -10,6 +10,7 @@ from .models import (
     HorarioApertura,
     LogAuditoria,
     Permiso,
+    PreferenciaNotificacionRol,
     Reserva,
     Rol,
     RolPermiso,
@@ -17,6 +18,7 @@ from .models import (
     TurnoFijo,
     Usuario,
 )
+from .services import PreferenciaNotificacionService
 
 
 class AdminBase(admin.ModelAdmin):
@@ -72,6 +74,23 @@ class CodigoRecuperacionContrasenaAdmin(AdminBase):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(PreferenciaNotificacionRol)
+class PreferenciaNotificacionRolAdmin(AdminBase):
+    """La matriz se lee desde la caché: todo cambio hecho acá la descarta para que rija de inmediato."""
+
+    list_display = ('rol_base', 'tipo_notificacion', 'habilitada', 'estado', 'fecha_creacion')
+    list_filter = ('estado', 'rol_base', 'tipo_notificacion', 'habilitada')
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        PreferenciaNotificacionService.invalidar_cache()
+
+    @admin.action(description='Desactivar seleccionados (baja lógica)', permissions=('change',))
+    def desactivar_seleccionados(self, request, queryset):
+        super().desactivar_seleccionados(request, queryset)
+        PreferenciaNotificacionService.invalidar_cache()
 
 
 for modelo in (

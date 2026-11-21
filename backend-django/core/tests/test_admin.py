@@ -21,7 +21,7 @@ class AdminTests(TestCase):
     def _modelos_core(self):
         return apps.get_app_config('core').get_models()
 
-    def test_las_15_tablas_estan_registradas(self):
+    def test_las_16_tablas_estan_registradas(self):
         for modelo in self._modelos_core():
             with self.subTest(modelo=modelo.__name__):
                 self.assertTrue(admin.site.is_registered(modelo))

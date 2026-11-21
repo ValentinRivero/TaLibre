@@ -27,6 +27,7 @@ from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from . import node_client
+from .catalogo_notificaciones import RolBaseNotificacion, combinaciones_validas, es_combinacion_valida
 from .email_service import EmailService, armar_codigo_recuperacion
 from .exceptions import ConflictoConConfirmacion, ConflictoNegocio, ServicioNoDisponible
 from .models import (
@@ -58,6 +59,7 @@ from .repositories import (
     GrillaRepository,
     HorarioAperturaRepository,
     PermisoRepository,
+    PreferenciaNotificacionRepository,
     RecuperacionContrasenaRepository,
     ReporteRepository,
     ReservaRepository,
@@ -3287,6 +3289,53 @@ def _destino(aviso):
 def _sin_usuario(ids, excluir):
     excluido = getattr(excluir, 'pk', excluir)
     return [identificador for identificador in ids if identificador != excluido]
+
+
+class PreferenciaNotificacionService:
+    """
+    Matriz de preferencias por rol base: qué tipos de aviso se despachan a cada rol. La plataforma solo guarda lo que
+    se apartó del valor por defecto (habilitada), así que la ausencia de una fila significa "se envía". El mapa completo
+    se lee una vez y vive en la caché de Django hasta que `invalidar_cache` lo descarta o vence su tiempo: con varios
+    procesos sin Redis, cada uno lo renueva por su cuenta al vencer.
+    """
+
+    CLAVE_CACHE = 'preferencias_notificaciones:mapa'
+
+    @staticmethod
+    def rol_base_de_nombre(nombre_rol):
+        """Rol base de un rol por su nombre: todo rol que no es de plataforma ni jugador (también los personalizados) opera."""
+        if not nombre_rol:
+            return None
+        return {
+            ROL_SUPERADMIN: RolBaseNotificacion.SUPERADMIN.value,
+            ROL_DUENO: RolBaseNotificacion.DUENO.value,
+            ROL_JUGADOR: RolBaseNotificacion.JUGADOR.value,
+        }.get(nombre_rol, RolBaseNotificacion.OPERADOR.value)
+
+    @staticmethod
+    def rol_base_de(usuario):
+        return PreferenciaNotificacionService.rol_base_de_nombre(RbacService.nombre_rol_activo(usuario))
+
+    @staticmethod
+    def mapa():
+        """{(rol_base, tipo): habilitada} para toda combinación válida del catálogo; las ausentes valen True."""
+        mapa = cache.get(PreferenciaNotificacionService.CLAVE_CACHE)
+        if mapa is None:
+            guardadas = PreferenciaNotificacionRepository.guardadas()
+            mapa = {combinacion: guardadas.get(combinacion, True) for combinacion in combinaciones_validas()}
+            cache.set(PreferenciaNotificacionService.CLAVE_CACHE, mapa)
+        return mapa
+
+    @staticmethod
+    def esta_habilitada(rol_base, tipo_notificacion):
+        """Una combinación fuera del catálogo nunca se despacha: no hay fila posible que la habilite."""
+        if not es_combinacion_valida(rol_base, tipo_notificacion):
+            return False
+        return PreferenciaNotificacionService.mapa()[(rol_base, tipo_notificacion)]
+
+    @staticmethod
+    def invalidar_cache():
+        cache.delete(PreferenciaNotificacionService.CLAVE_CACHE)
 
 
 class DestinatariosService:

@@ -40,6 +40,7 @@ from .models import (
     HorarioApertura,
     LogAuditoria,
     Permiso,
+    PreferenciaNotificacionRol,
     Reserva,
     Rol,
     RolPermiso,
@@ -1167,6 +1168,16 @@ class RecuperacionContrasenaRepository:
         return CodigoRecuperacionContrasena.objects.filter(
             fecha_creacion__lt=limite, ip_solicitud__isnull=False,
         ).update(ip_solicitud=None, fecha_modificacion=timezone.now())
+
+
+class PreferenciaNotificacionRepository:
+    @staticmethod
+    def guardadas():
+        """Lo que el superadministrador cambió y sigue vigente: {(rol_base, tipo_notificacion): habilitada}."""
+        filas = PreferenciaNotificacionRol.objects.filter(estado=EstadoRegistro.ACTIVO).values_list(
+            'rol_base', 'tipo_notificacion', 'habilitada',
+        )
+        return {(rol_base, tipo): habilitada for rol_base, tipo, habilitada in filas}
 
 
 class AuditoriaRepository:
