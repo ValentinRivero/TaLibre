@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import SimpleRouter
 
 from .views import (
+    CambiarContrasenaView,
     AgendaViewSet,
     AuditoriaViewSet,
     CanchaViewSet,
@@ -54,6 +55,7 @@ urlpatterns = [
     path('token/', LoginView.as_view(), name='token'),
     path('token/refresh/', RefreshView.as_view(), name='token_refresh'),
     path('token/logout/', LogoutView.as_view(), name='token_logout'),
+    path('auth/cambiar-contrasena/', CambiarContrasenaView.as_view(), name='cambiar_contrasena'),
     path('auth/recuperar-contrasena/', RecuperarContrasenaView.as_view(), name='recuperar_contrasena'),
     path('auth/restablecer-contrasena/', RestablecerContrasenaView.as_view(), name='restablecer_contrasena'),
     path('perfil/', PerfilView.as_view(), name='perfil'),

@@ -124,6 +124,18 @@ class RestablecerContrasenaSerializer(serializers.Serializer):
         return valor
 
 
+class CambiarContrasenaSerializer(serializers.Serializer):
+    """Valida solo el formato; la comparación con la contraseña vigente y la fortaleza las resuelve el servicio."""
+
+    contrasena_actual = serializers.CharField(write_only=True, trim_whitespace=False, max_length=LARGO_MAXIMO_PASSWORD)
+    nueva_contrasena = serializers.CharField(write_only=True, trim_whitespace=False, max_length=LARGO_MAXIMO_PASSWORD)
+
+    def validate_nueva_contrasena(self, valor):
+        if not PATRON_PASSWORD.match(valor):
+            raise serializers.ValidationError(MENSAJE_PASSWORD)
+        return valor
+
+
 class PerfilSerializer(serializers.ModelSerializer):
     rol = serializers.SerializerMethodField()
     estado_nombre = serializers.CharField(source='get_estado_display', read_only=True)

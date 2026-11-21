@@ -203,6 +203,7 @@ REST_FRAMEWORK = {
         'registro': _env_tasa('THROTTLE_REGISTRO', '10/hour'),
         'reservas': _env_tasa('THROTTLE_RESERVAS', '20/hour'),
         'transferencias': _env_tasa('THROTTLE_TRANSFERENCIAS', '10/hour'),
+        'cambiar_contrasena': _env_tasa('THROTTLE_CAMBIAR_CONTRASENA', '10/hour'),
         'recuperar_contrasena': _env_tasa('THROTTLE_RECUPERAR_CONTRASENA', '5/hour'),
         'restablecer_contrasena': _env_tasa('THROTTLE_RESTABLECER_CONTRASENA', '10/hour'),
         'grilla': _env_tasa('THROTTLE_GRILLA', '300/minute'),

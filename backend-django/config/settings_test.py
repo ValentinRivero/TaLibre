@@ -55,6 +55,7 @@ REST_FRAMEWORK = {
         'login': '5/minute',
         'reservas': '20/hour',
         'transferencias': '10/hour',
+        'cambiar_contrasena': '10/hour',
         'recuperar_contrasena': '5/hour',
         'restablecer_contrasena': '10/hour',
         'grilla': '300/minute',

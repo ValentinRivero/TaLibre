@@ -20,6 +20,12 @@ class RegistroRateThrottle(PorIpRateThrottle):
     scope = 'registro'
 
 
+class CambiarContrasenaRateThrottle(UserRateThrottle):
+    """Frena la prueba de contraseñas actuales con un access robado: se cuenta por cuenta, no por IP."""
+
+    scope = 'cambiar_contrasena'
+
+
 class RecuperarContrasenaRateThrottle(PorIpRateThrottle):
     """Cada pedido de código puede enviar un correo, que tiene cuota diaria: se limita por IP."""
 

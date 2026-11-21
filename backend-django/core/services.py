@@ -483,6 +483,31 @@ class UsuarioService:
         return usuario
 
     @staticmethod
+    def cambiar_contrasena(usuario, contrasena_actual, nueva_contrasena, ip_origen):
+        """
+        Cambio de contraseña de una sesión abierta. Cierra todas las sesiones, incluida la actual, e invalida los
+        códigos de recuperación pendientes: quien tenga un código viejo no puede pisar la clave nueva.
+        """
+        with transaction.atomic():
+            # La cuenta se relee bloqueada: la comparación no puede apoyarse en una contraseña cambiada en paralelo.
+            cuenta = UsuarioRepository.bloquear_por_id(usuario.pk)
+            if not cuenta.check_password(contrasena_actual):
+                raise ValidationError({'contrasena_actual': ['La contraseña actual es incorrecta.']})
+            if nueva_contrasena == contrasena_actual:
+                raise ValidationError({'nueva_contrasena': ['La nueva contraseña tiene que ser distinta de la actual.']})
+            _validar_fortaleza(cuenta, nueva_contrasena)
+
+            cuenta.set_password(nueva_contrasena)
+            UsuarioRepository.actualizar(cuenta, password=cuenta.password)
+            RecuperacionContrasenaRepository.invalidar_vigentes(cuenta.pk, timezone.now())
+            SesionRepository.revocar_refresh_de_usuario(cuenta.pk)
+            AuditoriaService.registrar(
+                TipoEventoAuditoria.CAMBIO_CONTRASENA, 'Cambio de contraseña desde la cuenta',
+                detalle='Contraseña cambiada por el titular y sesiones abiertas revocadas.',
+                usuario=cuenta, ip_origen=ip_origen,
+            )
+
+    @staticmethod
     def _validar_continuidad_superadmin(usuario, mensaje=MENSAJE_ULTIMO_SUPERADMIN_PROPIO):
         """
         La plataforma no puede quedar sin superadministrador activo. Se bloquean todas las filas de superadmins
@@ -554,6 +579,7 @@ class UsuarioService:
 
 
 MENSAJE_CODIGO_INVALIDO = 'El código es inválido o expiró.'
+MENSAJE_CONTRASENA_CAMBIADA = 'Contraseña actualizada. Iniciá sesión de nuevo con la nueva.'
 MENSAJE_CONTRASENA_RESTABLECIDA = 'Contraseña actualizada. Ya podés iniciar sesión con la nueva.'
 
 
@@ -562,6 +588,14 @@ def mensaje_solicitud_de_codigo():
         'Si el correo está registrado, enviamos un código de verificación válido por '
         f'{settings.RECUPERACION_CODIGO_MINUTOS} minutos.'
     )
+
+
+def _validar_fortaleza(usuario, contrasena):
+    """Los validadores de contraseña del proyecto, con la cuenta de referencia para rechazar claves parecidas a sus datos."""
+    try:
+        password_validation.validate_password(contrasena, user=usuario)
+    except DjangoValidationError as error:
+        raise ValidationError({'nueva_contrasena': list(error.messages)}) from None
 
 
 class CorreoService:
@@ -651,13 +685,6 @@ class RecuperacionContrasenaService:
             ))
 
     @staticmethod
-    def _validar_contrasena(usuario, contrasena):
-        try:
-            password_validation.validate_password(contrasena, user=usuario)
-        except DjangoValidationError as error:
-            raise ValidationError({'nueva_contrasena': list(error.messages)}) from None
-
-    @staticmethod
     def restablecer(email, codigo, nueva_contrasena, ip_origen):
         ahora = timezone.now()
         with transaction.atomic():
@@ -668,7 +695,7 @@ class RecuperacionContrasenaService:
             firma = _firmar_codigo(usuario.pk if activa else 0, codigo)
 
             if registro is not None and hmac.compare_digest(registro.codigo_hash, firma):
-                RecuperacionContrasenaService._validar_contrasena(usuario, nueva_contrasena)
+                _validar_fortaleza(usuario, nueva_contrasena)
                 usuario.set_password(nueva_contrasena)
                 UsuarioRepository.actualizar(usuario, password=usuario.password)
                 RecuperacionContrasenaRepository.marcar_usado(registro, ahora)

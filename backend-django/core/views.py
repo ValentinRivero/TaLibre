@@ -72,6 +72,7 @@ from .serializers import (
     VincularOperadorSerializer,
 )
 from .serializers_auth import (
+    CambiarContrasenaSerializer,
     LoginSerializer,
     PerfilEdicionSerializer,
     PerfilSerializer,
@@ -104,10 +105,12 @@ from .services import (
     TurnoFijoService,
     UsuarioAdminService,
     UsuarioService,
+    MENSAJE_CONTRASENA_CAMBIADA,
     MENSAJE_CONTRASENA_RESTABLECIDA,
     mensaje_solicitud_de_codigo,
 )
 from .throttles import (
+    CambiarContrasenaRateThrottle,
     GrillaRateThrottle,
     LoginRateThrottle,
     RecuperarContrasenaRateThrottle,
@@ -230,6 +233,26 @@ class RestablecerContrasenaView(VistaPublica):
         )
         respuesta = Response({'detail': MENSAJE_CONTRASENA_RESTABLECIDA})
         # Si este navegador tenía una sesión, su refresh ya quedó revocado: se descarta la cookie.
+        _borrar_cookie_refresh(respuesta)
+        return respuesta
+
+
+class CambiarContrasenaView(APIView):
+    """Cambio de contraseña de la cuenta autenticada; cierra todas sus sesiones."""
+
+    permission_classes = [TienePermisoRBAC]
+    permisos_requeridos = {'POST': ('editar_perfil_propio',)}
+    throttle_classes = [CambiarContrasenaRateThrottle]
+
+    def post(self, request):
+        serializer = CambiarContrasenaSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        datos = serializer.validated_data
+        UsuarioService.cambiar_contrasena(
+            request.user, datos['contrasena_actual'], datos['nueva_contrasena'],
+            AuditoriaService.ip_de_request(request),
+        )
+        respuesta = Response({'detail': MENSAJE_CONTRASENA_CAMBIADA})
         _borrar_cookie_refresh(respuesta)
         return respuesta
 

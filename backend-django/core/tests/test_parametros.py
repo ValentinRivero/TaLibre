@@ -26,7 +26,8 @@ VARIABLES_DE_ENTORNO = (
     'DATA_UPLOAD_MAX_MEMORY_SIZE', 'DATA_UPLOAD_MAX_NUMBER_FIELDS', 'CACHE_TIMEOUT_SEGUNDOS', 'CHANNEL_CAPACITY',
     'CHANNEL_EXPIRY_SEGUNDOS', 'CHANNEL_GROUP_EXPIRY_SEGUNDOS', 'RECORDATORIO_HORAS_ANTICIPACION',
     'RECORDATORIO_VERIFICACION_SEGUNDOS', 'REPORTE_LATENCIA_BD_MAXIMA_MS', 'ALERTA_LIMITE_VENTANA_SEGUNDOS',
-    'THROTTLE_RECUPERAR_CONTRASENA', 'THROTTLE_RESTABLECER_CONTRASENA', 'RECUPERACION_CODIGO_MINUTOS',
+    'THROTTLE_CAMBIAR_CONTRASENA', 'THROTTLE_RECUPERAR_CONTRASENA', 'THROTTLE_RESTABLECER_CONTRASENA',
+    'RECUPERACION_CODIGO_MINUTOS',
     'RECUPERACION_INTENTOS_MAXIMOS', 'RECUPERACION_ENFRIAMIENTO_SEGUNDOS', 'EMAIL_PROVEEDOR', 'RESEND_API_KEY',
     'EMAIL_REMITENTE', 'EMAIL_LIMITE_DIARIO', 'EMAIL_UMBRAL_ALERTA_PCT', 'EMAIL_TIMEOUT_SEGUNDOS',
     'EMAIL_ENVIO_EN_SEGUNDO_PLANO',
@@ -84,6 +85,7 @@ TASAS_POR_DEFECTO = {
     'registro': '10/hour',
     'reservas': '20/hour',
     'transferencias': '10/hour',
+    'cambiar_contrasena': '10/hour',
     'recuperar_contrasena': '5/hour',
     'restablecer_contrasena': '10/hour',
     'grilla': '300/minute',
@@ -155,6 +157,7 @@ class TestLecturaDelEntorno:
         ('THROTTLE_REGISTRO', 'registro'),
         ('THROTTLE_RESERVAS', 'reservas'),
         ('THROTTLE_TRANSFERENCIAS', 'transferencias'),
+        ('THROTTLE_CAMBIAR_CONTRASENA', 'cambiar_contrasena'),
         ('THROTTLE_RECUPERAR_CONTRASENA', 'recuperar_contrasena'),
         ('THROTTLE_RESTABLECER_CONTRASENA', 'restablecer_contrasena'),
         ('THROTTLE_GRILLA', 'grilla'),
@@ -236,7 +239,7 @@ class TestValoresInvalidos:
     @pytest.mark.parametrize('variable', [
         'THROTTLE_ANON', 'THROTTLE_USER', 'THROTTLE_LOGIN', 'THROTTLE_REGISTRO',
         'THROTTLE_RESERVAS', 'THROTTLE_TRANSFERENCIAS', 'THROTTLE_GRILLA', 'THROTTLE_GRAPHQL',
-        'THROTTLE_RECUPERAR_CONTRASENA', 'THROTTLE_RESTABLECER_CONTRASENA',
+        'THROTTLE_CAMBIAR_CONTRASENA', 'THROTTLE_RECUPERAR_CONTRASENA', 'THROTTLE_RESTABLECER_CONTRASENA',
     ])
     @pytest.mark.parametrize('valor', ['cinco/minute', '0/minute', '5', '5/', '5/minuto/dia', '-3/hour', '5/Minute'])
     def test_una_tasa_con_formato_invalido_corta_el_arranque(self, cargar_settings, variable, valor):
