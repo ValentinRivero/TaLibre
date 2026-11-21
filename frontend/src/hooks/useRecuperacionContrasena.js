@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PARAMETROS } from '../config/parametros.js';
 import { t } from '../i18n/index.js';
 import { cerrarSesionLocal, restablecerContrasena, solicitarCodigoRecuperacion } from '../services/authService.js';
 import { esCodigoRechazado, normalizarCodigo } from '../utils/recuperacion.js';
 import { validarRecuperar, validarRestablecer } from '../utils/validacionesCuenta.js';
-import useCuentaRegresiva from './useCuentaRegresiva.js';
+import useEnfriamientoCodigo from './useEnfriamientoCodigo.js';
 import useEnvio from './useEnvio.js';
 
 export const PASO = Object.freeze({ SOLICITAR: 1, RESTABLECER: 2 });
@@ -13,7 +12,8 @@ export const PASO = Object.freeze({ SOLICITAR: 1, RESTABLECER: 2 });
 const VACIO = Object.freeze({ codigo: '', nueva_contrasena: '', confirmar_contrasena: '' });
 
 /**
- * Recuperación de la contraseña en dos pasos (pedir el código y usarlo). `emailInicial` es el correo con el que arranca
+ * Recuperación de la contraseña en dos pasos (pedir el código y usarlo). La espera entre dos pedidos rige por correo
+ * y sobrevive a cambiar de pantalla y a recargar (`useEnfriamientoCodigo`). `emailInicial` es el correo con el que arranca
  * el formulario (el de la sesión abierta o el que se escribió en el login); mientras la persona no lo edite, sigue a
  * ese valor. Al terminar bien, si había sesión se limpia en el cliente (el servidor ya revocó los refresh tokens) y se
  * va al login con el aviso.
@@ -28,9 +28,9 @@ export default function useRecuperacionContrasena({ emailInicial, autenticado })
   const [errores, setErrores] = useState({});
   const solicitud = useEnvio();
   const restablecimiento = useEnvio();
-  const espera = useCuentaRegresiva();
 
   const valores = { email: emailEscrito ?? emailInicial, ...resto };
+  const espera = useEnfriamientoCodigo(valores.email);
 
   const cambiar = (campo, valor) => {
     if (campo === 'email') setEmailEscrito(valor);
@@ -40,6 +40,7 @@ export default function useRecuperacionContrasena({ emailInicial, autenticado })
   };
 
   const pedirCodigo = async () => {
+    if (espera.restantes > 0) return;
     const invalidos = validarRecuperar(valores);
     setErrores(invalidos);
     if (Object.keys(invalidos).length > 0) return;
@@ -47,7 +48,7 @@ export default function useRecuperacionContrasena({ emailInicial, autenticado })
     const { ok } = await solicitud.enviar(() => solicitarCodigoRecuperacion(valores.email.trim()));
     if (!ok) return;
     setResto((actuales) => ({ ...actuales, codigo: '' }));
-    espera.iniciar(PARAMETROS.recuperacion.enfriamientoSegundos);
+    espera.iniciar(valores.email);
     setCodigoPedido(true);
     setPaso(PASO.RESTABLECER);
   };
@@ -63,6 +64,7 @@ export default function useRecuperacionContrasena({ emailInicial, autenticado })
       nueva_contrasena: valores.nueva_contrasena,
     }));
     if (ok) {
+      espera.limpiar(valores.email);
       if (autenticado) cerrarSesionLocal();
       navegar('/login', { replace: true, state: { aviso: t('recuperar.exito') } });
     } else if (esCodigoRechazado(error)) {

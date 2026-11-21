@@ -24,6 +24,7 @@ const CLAVES = [
   'recuperar.descripcionPaso2',
   'recuperar.email',
   'recuperar.enviarCodigo',
+  'recuperar.enviarCodigoEn',
   'recuperar.enviando',
   'recuperar.yaTengoCodigo',
   'recuperar.volverLogin',
@@ -78,6 +79,10 @@ describe('textos de recuperación y cambio de contraseña', () => {
   test('el aviso de éxito pide entrar con la contraseña nueva', () => {
     expect(t('recuperar.exito')).toBe('Contraseña actualizada. Iniciá sesión con tu nueva contraseña.');
     expect(t('perfil.contrasenaCambiada')).toBe(t('recuperar.exito'));
+  });
+
+  test('la espera para pedir el código muestra los segundos', () => {
+    expect(t('recuperar.enviarCodigoEn', { segundos: 42 })).toBe('Enviar código en 42 s');
   });
 
   test('la cuenta regresiva muestra los segundos', () => {

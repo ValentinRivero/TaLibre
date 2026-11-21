@@ -56,6 +56,7 @@ export default function RecuperarContrasena() {
           onCambiar={flujo.cambiar}
           onEnviar={flujo.pedirCodigo}
           enviando={flujo.solicitud.enviando}
+          segundosDeEspera={flujo.segundosDeEspera}
           onYaTengoCodigo={flujo.yaTengoCodigo}
         />
       )}

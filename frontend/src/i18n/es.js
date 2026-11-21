@@ -607,6 +607,7 @@ const es = {
     descripcionPaso2: 'Ingresá el código que te enviamos y elegí tu contraseña nueva.',
     email: 'Correo electrónico',
     enviarCodigo: 'Enviar código',
+    enviarCodigoEn: 'Enviar código en %segundos% s',
     enviando: 'Enviando',
     yaTengoCodigo: 'Ya tengo un código',
     volverLogin: 'Volver a iniciar sesión',

@@ -10,9 +10,19 @@ import CampoFormulario from './CampoFormulario.jsx';
 /**
  * Paso 1 de la recuperación (presentación): el correo al que se envía el código. El estado y el envío los maneja
  * `hooks/useRecuperacionContrasena.js`. `error` es el `ErrorApi` del último pedido y `errores`, los avisos de
- * validación del propio formulario.
+ * validación del propio formulario. Con `segundosDeEspera` (se pidió un código para este correo hace poco) el envío
+ * queda deshabilitado y muestra lo que falta.
  */
-export default function FormularioSolicitarCodigo({ email, errores = {}, error, onCambiar, onEnviar, enviando, onYaTengoCodigo }) {
+export default function FormularioSolicitarCodigo({
+  email,
+  errores = {},
+  error,
+  onCambiar,
+  onEnviar,
+  enviando,
+  segundosDeEspera = 0,
+  onYaTengoCodigo,
+}) {
   const campos = { ...(error?.campos ?? {}), ...errores };
 
   return (
@@ -40,8 +50,14 @@ export default function FormularioSolicitarCodigo({ email, errores = {}, error, 
           onCambiar={(valor) => onCambiar('email', valor)}
           error={campos.email}
         />
-        <BotonAccion type="submit" className="w-100" cargando={enviando} textoCargando={t('recuperar.enviando')}>
-          {t('recuperar.enviarCodigo')}
+        <BotonAccion
+          type="submit"
+          className="w-100"
+          cargando={enviando}
+          disabled={segundosDeEspera > 0}
+          textoCargando={t('recuperar.enviando')}
+        >
+          {segundosDeEspera > 0 ? t('recuperar.enviarCodigoEn', { segundos: segundosDeEspera }) : t('recuperar.enviarCodigo')}
         </BotonAccion>
         <div className="text-center mt-3">
           <Button variant="link" className="p-0" onClick={onYaTengoCodigo}>{t('recuperar.yaTengoCodigo')}</Button>
