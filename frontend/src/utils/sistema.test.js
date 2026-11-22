@@ -3,6 +3,7 @@ import {
   aParametrosAuditoria,
   aParametrosContratos,
   aParametrosUsuarios,
+  complejosDeUsuario,
   cuerpoComplejoNuevo,
   cuerpoUsuario,
   esDireccionIp,
@@ -200,5 +201,27 @@ describe('rutaDeFichaUsuario', () => {
     const id = new URLSearchParams(rutaDeFichaUsuario(42).split('?')[1]).get('verUsuario');
 
     expect(idDeUsuarioEnRuta(id)).toBe(42);
+  });
+});
+
+describe('complejosDeUsuario', () => {
+  const base = { complejo_operado: null, complejo_operado_nombre: null, complejos_propios: [] };
+
+  test('un dueño muestra todos los complejos de los que es titular', () => {
+    const propios = [{ id: 3, nombre: 'Alfa Fútbol' }, { id: 7, nombre: 'Beta Pádel' }];
+
+    expect(complejosDeUsuario({ ...base, complejos_propios: propios })).toEqual(propios);
+  });
+
+  test('un operador muestra el único complejo que opera', () => {
+    const operador = { ...base, complejo_operado: 4, complejo_operado_nombre: 'Complejo El Yacaré' };
+
+    expect(complejosDeUsuario(operador)).toEqual([{ id: 4, nombre: 'Complejo El Yacaré' }]);
+  });
+
+  test('una cuenta sin vínculos, o sin datos, no muestra ninguno', () => {
+    expect(complejosDeUsuario(base)).toEqual([]);
+    expect(complejosDeUsuario({ complejo_operado: 4 })).toEqual([]);
+    expect(complejosDeUsuario(undefined)).toEqual([]);
   });
 });

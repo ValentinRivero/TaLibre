@@ -1,14 +1,15 @@
 import { describir, ESTADO_USUARIO, ETIQUETA_ROL } from '../config/catalogos.js';
 import useResumenUsuario from '../hooks/useResumenUsuario.js';
 import { t } from '../i18n/index.js';
+import { complejosDeUsuario } from '../utils/sistema.js';
 import Cargando from './Cargando.jsx';
 
 const BAJA = 0;
 
 /**
- * Resumen mínimo de una cuenta (nombre, rol, estado y complejo) para el recuadro emergente de la auditoría. Se
- * monta recién al mostrarse el recuadro, así que solo consulta las cuentas que el superadmin realmente mira. El
- * complejo es el vinculado a la cuenta o, si no tiene, el del evento de auditoría (`complejoNombre`).
+ * Resumen mínimo de una cuenta (nombre, rol, estado y complejos) para el recuadro emergente de la auditoría. Se
+ * monta recién al mostrarse el recuadro, así que solo consulta las cuentas que el superadmin realmente mira. Los
+ * complejos son los vinculados a la cuenta o, si no tiene, el del evento de auditoría (`complejoNombre`).
  */
 export default function ResumenUsuario({ usuarioId, complejoNombre }) {
   const { datos, error, cargando } = useResumenUsuario(usuarioId);
@@ -17,7 +18,8 @@ export default function ResumenUsuario({ usuarioId, complejoNombre }) {
   if (error || !datos) return <p className="small text-danger mb-0">{t('usuarios.resumenError')}</p>;
 
   const estado = describir(ESTADO_USUARIO, datos.estado);
-  const complejo = datos.complejo_operado_nombre || complejoNombre;
+  const complejosDeLaCuenta = complejosDeUsuario(datos).map((vinculado) => vinculado.nombre).join(', ');
+  const complejo = complejosDeLaCuenta || complejoNombre;
 
   return (
     <div>
