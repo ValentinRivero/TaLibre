@@ -12,6 +12,7 @@ const POR_DEFECTO = {
   http: { timeoutDjangoMs: 5_000, timeoutClimaMs: 5_000 },
   bodyMaximoBytes: 10_240,
   mongo: { timeoutSeleccionMs: 10_000, maxPoolSize: 100 },
+  docsHabilitada: true,
   rangoMaximoDias: 366,
   estado: { latenciaMongoMaximaMs: 500, memoriaMaximaMb: 1_024, fallasExternasMaximas: 5, ventanaFallasMs: 300_000 },
 };
@@ -84,6 +85,12 @@ describe('Lectura del entorno', () => {
     expect(parametros.puerto).toBe(3000);
   });
 
+  test.each([
+    ['false', false], ['0', false], ['FALSE', false], [' true ', true], ['1', true],
+  ])('API_DOCS_HABILITADA=%s se lee como %s', (valor, esperado) => {
+    expect(leerParametros({ API_DOCS_HABILITADA: valor }).docsHabilitada).toBe(esperado);
+  });
+
   test('tolera espacios alrededor del número', () => {
     expect(leerParametros({ PORT: ' 8080 ' }).puerto).toBe(8080);
   });
@@ -141,6 +148,10 @@ describe('Valores inválidos', () => {
     ['ESTADO_VENTANA_FALLAS_MS', '999'],
   ])('%s=%s corta el arranque y nombra la variable', (variable, valor) => {
     expect(() => leerParametros({ [variable]: valor })).toThrow(variable);
+  });
+
+  test.each(['si', 'off', '2'])('API_DOCS_HABILITADA=%s corta el arranque y nombra la variable', (valor) => {
+    expect(() => leerParametros({ API_DOCS_HABILITADA: valor })).toThrow('API_DOCS_HABILITADA');
   });
 
   test.each([

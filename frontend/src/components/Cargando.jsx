@@ -48,10 +48,16 @@ export default function Cargando({ variante = 'seccion', texto, className = '' }
   }
 
   const contenedor = { superpuesto: 'cargando-superpuesto', pantalla: 'cargando-pantalla' }[variante] ?? 'cargando-seccion';
-  return (
-    <div role="status" className={`${contenedor} ${className}`.trim()}>
+  const contenido = (
+    <>
       <AnimacionPelotas chica={contenedor === 'cargando-seccion'} />
       <span className="cargando-leyenda">{leyenda}</span>
+    </>
+  );
+  return (
+    <div role="status" className={`${contenedor} ${className}`.trim()}>
+      {/* Sobre una pantalla larga, la animación queda fija a la vista aunque la página esté desplazada. */}
+      {variante === 'superpuesto' ? <div className="cargando-superpuesto-centro">{contenido}</div> : contenido}
     </div>
   );
 }

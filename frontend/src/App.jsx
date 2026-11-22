@@ -6,7 +6,9 @@ import Layout from './components/Layout.jsx';
 import PantallaEstado from './components/PantallaEstado.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ScrollAlInicio from './components/ScrollAlInicio.jsx';
+import useUbicacionMostrada, { NavegacionContext } from './hooks/useUbicacionMostrada.js';
 import { t } from './i18n/index.js';
+import { anchoDePlantilla } from './utils/navegacion.js';
 import Catalogo from './pages/Catalogo.jsx';
 import Login from './pages/Login.jsx';
 import Privacidad from './pages/Privacidad.jsx';
@@ -47,77 +49,71 @@ function NoEncontrada() {
   );
 }
 
-const RUTA_PORTADA = '/';
-
-// La portada arma sus propias secciones (el hero ocupa todo el ancho): el resto de las pantallas públicas va en el contenedor estándar.
-function PlantillaPublica() {
+// Una sola plantilla para todas las pantallas: la barra y el límite de carga no se vuelven a montar al pasar de las
+// públicas a los paneles. La portada arma sus propias secciones (el hero ocupa todo el ancho) y los paneles de
+// administración usan el contenedor fluido.
+function Plantilla() {
   const { pathname } = useLocation();
   return (
-    <Layout ancho={pathname === RUTA_PORTADA ? 'completo' : 'normal'}>
-      <Outlet />
-    </Layout>
-  );
-}
-
-function PlantillaPanel() {
-  return (
-    <Layout ancho="panel" claveCarga="panel">
+    <Layout ancho={anchoDePlantilla(pathname)}>
       <Outlet />
     </Layout>
   );
 }
 
 export default function App() {
-  return (
-    <Suspense fallback={<Cargando variante="pantalla" texto={t('comun.cargandoPantalla')} />}>
-      <AceptarPolitica />
-      <ScrollAlInicio />
-      <Routes>
-        <Route element={<PlantillaPublica />}>
-          <Route path="/" element={<Catalogo />} />
-          <Route path="/complejos/:id" element={<ComplejoDetalle />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/registro" element={<Registro />} />
-          <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
-          <Route path="/privacidad" element={<Privacidad />} />
-          <Route path="/terminos" element={<Terminos />} />
-          <Route
-            path="/mis-reservas"
-            element={<ProtectedRoute seccion="misReservas"><MisReservas /></ProtectedRoute>}
-          />
-          <Route path="/perfil" element={<ProtectedRoute seccion="perfil"><Perfil /></ProtectedRoute>} />
-          {GuiaVisual && <Route path="/guia" element={<GuiaVisual />} />}
-          <Route
-            path="/notificaciones"
-            element={<ProtectedRoute seccion="notificaciones"><Notificaciones /></ProtectedRoute>}
-          />
+  const { ubicacion, navegando } = useUbicacionMostrada();
 
-          <Route path="*" element={<NoEncontrada />} />
-        </Route>
-        <Route element={<PlantillaPanel />}>
-          <Route path="/panel/notificaciones" element={<Navigate to="/panel/registro" replace />} />
-          <Route path="/panel" element={<ProtectedRoute seccion="panel"><LayoutPanel /></ProtectedRoute>}>
-            <Route index element={<PanelComplejo />} />
-            <Route path="canchas" element={<GestionCanchas />} />
-            <Route path="excepciones" element={<GestionExcepciones />} />
-            <Route path="agenda" element={<ProtectedRoute seccion="agenda"><Agenda /></ProtectedRoute>} />
-            <Route path="reportes" element={<ProtectedRoute seccion="reportes"><Reportes /></ProtectedRoute>} />
+  return (
+    <NavegacionContext.Provider value={navegando}>
+      <Suspense fallback={<Cargando variante="pantalla" texto={t('comun.cargandoPantalla')} />}>
+        <AceptarPolitica />
+        <ScrollAlInicio pathname={ubicacion.pathname} />
+        <Routes location={ubicacion}>
+          <Route element={<Plantilla />}>
+            <Route path="/" element={<Catalogo />} />
+            <Route path="/complejos/:id" element={<ComplejoDetalle />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/registro" element={<Registro />} />
+            <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
+            <Route path="/privacidad" element={<Privacidad />} />
+            <Route path="/terminos" element={<Terminos />} />
             <Route
-              path="registro"
-              element={<ProtectedRoute seccion="registroComplejo"><RegistroComplejo /></ProtectedRoute>}
+              path="/mis-reservas"
+              element={<ProtectedRoute seccion="misReservas"><MisReservas /></ProtectedRoute>}
             />
+            <Route path="/perfil" element={<ProtectedRoute seccion="perfil"><Perfil /></ProtectedRoute>} />
+            {GuiaVisual && <Route path="/guia" element={<GuiaVisual />} />}
+            <Route
+              path="/notificaciones"
+              element={<ProtectedRoute seccion="notificaciones"><Notificaciones /></ProtectedRoute>}
+            />
+
+            <Route path="*" element={<NoEncontrada />} />
+            <Route path="/panel/notificaciones" element={<Navigate to="/panel/registro" replace />} />
+            <Route path="/panel" element={<ProtectedRoute seccion="panel"><LayoutPanel /></ProtectedRoute>}>
+              <Route index element={<PanelComplejo />} />
+              <Route path="canchas" element={<GestionCanchas />} />
+              <Route path="excepciones" element={<GestionExcepciones />} />
+              <Route path="agenda" element={<ProtectedRoute seccion="agenda"><Agenda /></ProtectedRoute>} />
+              <Route path="reportes" element={<ProtectedRoute seccion="reportes"><Reportes /></ProtectedRoute>} />
+              <Route
+                path="registro"
+                element={<ProtectedRoute seccion="registroComplejo"><RegistroComplejo /></ProtectedRoute>}
+              />
+            </Route>
+            <Route path="/sistema" element={<ProtectedRoute seccion="sistema"><LayoutSistema /></ProtectedRoute>}>
+              <Route index element={<PanelSistema />} />
+              <Route path="roles" element={<Roles />} />
+              <Route path="contratos" element={<Contratos />} />
+              <Route path="deportes" element={<CatalogoSistema recurso="deportes" />} />
+              <Route path="servicios" element={<CatalogoSistema recurso="servicios" />} />
+              <Route path="notificaciones" element={<PreferenciasNotificacion />} />
+              <Route path="auditoria" element={<Auditoria />} />
+            </Route>
           </Route>
-          <Route path="/sistema" element={<ProtectedRoute seccion="sistema"><LayoutSistema /></ProtectedRoute>}>
-            <Route index element={<PanelSistema />} />
-            <Route path="roles" element={<Roles />} />
-            <Route path="contratos" element={<Contratos />} />
-            <Route path="deportes" element={<CatalogoSistema recurso="deportes" />} />
-            <Route path="servicios" element={<CatalogoSistema recurso="servicios" />} />
-            <Route path="notificaciones" element={<PreferenciasNotificacion />} />
-            <Route path="auditoria" element={<Auditoria />} />
-          </Route>
-        </Route>
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </NavegacionContext.Provider>
   );
 }

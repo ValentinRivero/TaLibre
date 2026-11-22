@@ -18,6 +18,7 @@ import Cargando from './Cargando.jsx';
 import BannerInstalarPWA from './BannerInstalarPWA.jsx';
 import CampanaNotificaciones from './CampanaNotificaciones.jsx';
 import PiePagina from './PiePagina.jsx';
+import { useNavegacionEnCurso } from '../hooks/useUbicacionMostrada.js';
 
 // La bandeja personal se abre desde la campana y no tiene enlace de texto en el menú.
 const RUTA_NOTIFICACIONES = '/notificaciones';
@@ -39,10 +40,11 @@ const SECCIONES_DE_SESION = [
  * `ancho` admite `panel` para los paneles de administración (contenedor fluido y densidad de escritorio) y `completo`
  * para las pantallas que arman sus propias secciones: no envuelve el contenido en un contenedor ni le da relleno
  * vertical, así una sección puede ocupar el ancho de la ventana (portada) y el resto ubicarse en su `Container`.
- * `claveCarga` fija el límite de carga: por defecto cambia con la ruta; un panel con subvistas propias lo fija para
- * que su estructura (selector, subnavegación) no se vuelva a montar al pasar de una subvista a otra.
+ * El límite de carga es uno solo y no se vuelve a montar: al cambiar de pantalla la anterior sigue visible y, mientras
+ * la nueva se prepara, el velo de carga la cubre (`useNavegacionEnCurso`). Su respaldo solo aparece en la primera
+ * carga, cuando no hay una pantalla previa que mostrar.
  */
-export default function Layout({ enlaces = [], ancho = 'normal', claveCarga, children }) {
+export default function Layout({ enlaces = [], ancho = 'normal', children }) {
   const esPanel = ancho === 'panel';
   const esCompleto = ancho === 'completo';
   const { autenticado, usuario, rol } = useSesion();
@@ -52,6 +54,7 @@ export default function Layout({ enlaces = [], ancho = 'normal', claveCarga, chi
   const barra = useRef(null);
   const desplazado = useDesplazado();
   const pwa = useInstalacionPwa();
+  const navegando = useNavegacionEnCurso();
 
   const seccionesVisibles = autenticado ? SECCIONES_DE_SESION.filter(({ seccion }) => puedeVer(seccion, rol)) : [];
   // El enlace activo sale de la ruta actual y es uno solo: no depende del foco ni del historial del navegador.
@@ -175,8 +178,8 @@ export default function Layout({ enlaces = [], ancho = 'normal', claveCarga, chi
         id="contenido"
         className={`flex-grow-1 position-relative${esCompleto ? '' : ' py-4'}${esPanel ? ' panel-admin' : ''}`}
       >
-        {/* `key` crea un límite nuevo por pantalla: así la carga de una ruta diferida muestra el overlay también al navegar. */}
-        <Suspense key={claveCarga ?? pathname} fallback={<Cargando variante="superpuesto" />}>
+        {navegando && <Cargando variante="superpuesto" />}
+        <Suspense fallback={<Cargando variante="superpuesto" />}>
           {esCompleto ? children : <Container fluid={esPanel}>{children}</Container>}
         </Suspense>
       </main>

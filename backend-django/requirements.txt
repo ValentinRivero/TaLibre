@@ -11,6 +11,8 @@ channels-redis==4.3.0
 redis==8.1.0
 django-filter==26.2
 graphene-django==3.2.3
+drf-spectacular==0.30.0
+drf-spectacular-sidecar==2026.10.1
 whitenoise==6.12.0
 pytest==9.2.0
 pytest-django==4.14.0

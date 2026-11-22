@@ -7,6 +7,8 @@ import unicodedata
 import django_filters
 from django.db.models import CharField, TextField, Transform
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework.filters import SearchFilter
 
 from .models import (
@@ -73,9 +75,16 @@ ESTADOS_CANCHA_VISIBLES = [
 
 
 class CatalogoComplejoFilter(django_filters.FilterSet):
-    deporte = django_filters.ModelChoiceFilter(queryset=CatalogoRepository.deportes_activos())
-    cobertura = django_filters.TypedChoiceFilter(choices=Cobertura.choices, coerce=int)
-    servicio = django_filters.ModelMultipleChoiceFilter(queryset=CatalogoRepository.servicios_activos())
+    # Los tipos explícitos son para el esquema OpenAPI: el filtrado lo resuelve filter_queryset sobre las canchas.
+    deporte = extend_schema_field(OpenApiTypes.INT)(
+        django_filters.ModelChoiceFilter(queryset=CatalogoRepository.deportes_activos())
+    )
+    cobertura = extend_schema_field(OpenApiTypes.INT)(
+        django_filters.TypedChoiceFilter(choices=Cobertura.choices, coerce=int)
+    )
+    servicio = extend_schema_field(OpenApiTypes.INT)(
+        django_filters.ModelMultipleChoiceFilter(queryset=CatalogoRepository.servicios_activos())
+    )
 
     def filter_queryset(self, queryset):
         # deporte y cobertura se exigen sobre una misma cancha activa: "pádel techado" no lo cumple

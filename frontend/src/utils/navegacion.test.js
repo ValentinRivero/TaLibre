@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { enlaceActivo } from './navegacion.js';
+import { anchoDePlantilla, enlaceActivo } from './navegacion.js';
 
 const RUTAS = ['/', '/mis-reservas', '/panel', '/panel/reportes', '/perfil'];
 
@@ -27,4 +27,21 @@ describe('enlaceActivo', () => {
   test('al volver a la portada deja de estar activa la sección anterior', () => {
     expect(enlaceActivo('/mis-reservas', RUTAS)).not.toBe(enlaceActivo('/', RUTAS));
   });
+});
+
+describe('anchoDePlantilla', () => {
+  test('la portada usa todo el ancho', () => {
+    expect(anchoDePlantilla('/')).toBe('completo');
+  });
+
+  test.each(['/panel', '/panel/agenda', '/sistema', '/sistema/auditoria'])('%s usa el contenedor de panel', (ruta) => {
+    expect(anchoDePlantilla(ruta)).toBe('panel');
+  });
+
+  test.each(['/login', '/complejos/3', '/mis-reservas', '/terminos', '/panelito', '/sistemas'])(
+    '%s usa el contenedor estándar',
+    (ruta) => {
+      expect(anchoDePlantilla(ruta)).toBe('normal');
+    },
+  );
 });

@@ -1,5 +1,5 @@
 import { Suspense, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { puedeVer } from '../config/catalogos.js';
 import useComplejoActivo from '../hooks/useComplejoActivo.js';
 import useConsulta from '../hooks/useConsulta.js';
@@ -26,11 +26,11 @@ const SECCIONES = [
  * Estructura de `/panel/*`: carga los complejos que el usuario administra, mantiene el complejo activo en memoria
  * (se elige desde el selector superior; con uno solo se toma automáticamente), muestra la subnavegación según el rol
  * y entrega a cada subvista el complejo activo por el contexto de la ruta (ver `useContextoPanel`). Cada complejo
- * y cada subvista tienen su propio límite de carga, así que cambiar de uno u otra reinicia el estado local.
+ * tiene su propio límite de carga, así que cambiar de complejo reinicia el estado local. Al pasar de una subvista a
+ * otra, la anterior queda visible bajo el velo de carga hasta que la nueva está lista.
  */
 export default function LayoutPanel() {
   const { rol } = useSesion();
-  const { pathname } = useLocation();
   const { elegido, elegir } = useComplejoActivo();
   const consulta = useConsulta((signal) => listarAdministrados(signal), []);
   const [reemplazos, setReemplazos] = useState({ base: null, porId: {} });
@@ -62,7 +62,7 @@ export default function LayoutPanel() {
         <SelectorComplejo complejos={complejos} activo={complejo} onElegir={elegir} />
       </div>
       <SubnavegacionPanel secciones={secciones} />
-      <Suspense key={`${complejo.id}:${pathname}`} fallback={<Cargando variante="seccion" />}>
+      <Suspense key={complejo.id} fallback={<Cargando variante="seccion" />}>
         <Outlet context={{ complejo, actualizarComplejo }} />
       </Suspense>
     </div>

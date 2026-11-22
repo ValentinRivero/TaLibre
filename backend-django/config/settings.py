@@ -107,6 +107,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
     'graphene_django',
     'channels',
     'core',
@@ -176,6 +178,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
@@ -236,6 +239,44 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'usuario_id',
+}
+
+# Documentación interactiva de la API (OpenAPI 3 con Swagger UI). Es pública: describe el mismo contrato que
+# docs/API.md y excluye las rutas entre servicios y la administración (core/openapi.py).
+API_DOCS_HABILITADA = _env_bool('API_DOCS_HABILITADA', True)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'TaLibre API',
+    'DESCRIPTION': (
+        'API REST del núcleo transaccional de TaLibre: sesión y perfil, catálogo público, grilla, reservas, '
+        'administración de complejos, reportes y sistema. Las rutas protegidas usan el access token JWT en el '
+        'encabezado Authorization: Bearer. Los errores siguen el formato {"detail": ..., "code": ...}.'
+    ),
+    'VERSION': '1.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
+    'SERVE_AUTHENTICATION': [],
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+    'PREPROCESSING_HOOKS': ['core.openapi.excluir_rutas_no_publicas'],
+    # Mismo diseño que la documentación de backend-node: barra superior con el selector de modo claro y oscuro. Va como
+    # texto porque los presets son objetos de JavaScript. Sin validador externo: no se envía la URL a terceros.
+    'SWAGGER_UI_SETTINGS': (
+        '{ deepLinking: true, validatorUrl: null, layout: "StandaloneLayout",'
+        ' presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset] }'
+    ),
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
+    # Varios modelos tienen un campo `estado` con conjuntos de valores distintos: cada uno con su nombre propio.
+    'ENUM_NAME_OVERRIDES': {
+        'EstadoRegistroEnum': 'core.models.EstadoRegistro',
+        'EstadoUsuarioEnum': 'core.models.EstadoUsuario',
+        'EstadoCanchaEnum': 'core.models.EstadoCancha',
+        'EstadoTurnoFijoEnum': 'core.models.EstadoTurnoFijo',
+        'EstadoContratoEnum': 'core.models.EstadoContrato',
+        'EstadoReservaEnum': 'core.models.EstadoReserva',
+        'EstadoPagoEnum': 'core.models.EstadoPago',
+    },
 }
 
 # Versión vigente de la política de privacidad publicada en el frontend; cambiarla obliga a aceptarla de nuevo.

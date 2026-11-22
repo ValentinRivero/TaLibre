@@ -28,6 +28,24 @@ Referencia de los endpoints vigentes del backend principal. Todas las rutas cuel
 
 **Bajas.** Ningún `DELETE` borra datos: aplica una baja lógica.
 
+## Documentación interactiva (OpenAPI)
+
+Las dos APIs publican su contrato en formato OpenAPI 3 y una interfaz Swagger UI para explorarlo y probarlo desde el navegador, sin escribir código. Describen lo mismo que este documento: sirven para ver cada ruta con sus parámetros, cuerpos, respuestas y códigos de error, y para generar clientes o importar la colección en Postman o Insomnia. Son públicas, se sirven desde cada backend (sin recursos de terceros) y no incluyen rutas internas entre servicios.
+
+| API | Interfaz | Especificación |
+|---|---|---|
+| Principal | `GET /api/docs-django/` | `GET /api/docs-django/openapi.json` |
+| Servicio complementario | `GET /api/docs-node/` | `GET /api/docs-node/openapi.json` |
+
+**Cómo se usa.**
+
+1. Abrir la interfaz en el navegador. Las rutas están agrupadas por recurso, con un selector de modo claro y oscuro arriba a la derecha.
+2. Las rutas públicas se prueban directamente: desplegar la ruta, "Try it out", completar los parámetros y "Execute". La interfaz muestra la URL, el comando `curl` equivalente y la respuesta real.
+3. Para las privadas, obtener un access con `POST /api/token/` (desde la misma interfaz o desde la aplicación), tocar "Authorize", pegar el access sin el prefijo `Bearer` y confirmar. Desde ese momento cada pedido lleva `Authorization: Bearer <access>`, con los mismos permisos que en la aplicación. El mismo access sirve en las dos interfaces.
+4. La especificación en JSON se puede descargar o importar en otra herramienta (por ejemplo, Postman: Import, Link, con la URL de `openapi.json`).
+
+Las acciones que escriben (altas, bajas, reservas) se ejecutan de verdad sobre la base del entorno en que se usan: para probarlas conviene una cuenta de demostración.
+
 ## Sesión y perfil
 
 | Método y ruta | Acceso | Uso |
@@ -394,6 +412,8 @@ Si el cambio deja reservas por jugar (pendientes, confirmadas o señadas) o turn
 |---|---|---|
 | `POST /graphql/` | Público; cada campo aplica sus permisos | `{ "query", "variables" }` en JSON |
 
+Capa de consulta alternativa a REST con tres consultas y una mutación: `catalogoComplejos`, `detalleComplejo`, `misReservas` y `crearReserva`. Cada una ejecuta la misma acción de la API REST (mismos permisos, filtros, paginación, validaciones y auditoría), así que las dos APIs no pueden dar resultados distintos. Lo que agrega es elegir los campos de la respuesta y combinar en una sola consulta datos de los dos backends.
+
 - Usa el mismo access token que REST en `Authorization: Bearer <access>`. Igual que en las rutas públicas de REST, un token inválido o vencido no impide consultar los campos públicos.
 - Solo admite POST: GET responde `405`.
 - Cada operación admite como máximo 5 campos de primer nivel, contando alias y fragmentos, y la profundidad de anidamiento está limitada; si se excede, responde `400` sin ejecutar nada. La introspección del esquema está deshabilitada en producción.
@@ -414,6 +434,28 @@ query {
 ```
 
 Cada complejo expone `id`, `nombre`, `direccion`, `latitud`, `longitud`, `telefonoContacto`, `horasLimiteCancelacion`, `infoSena`, `porcentajeSena`, `precioDesde`, `servicios` y `deportes`. Los decimales llegan como texto, igual que en REST.
+
+### `detalleComplejo`
+
+Ficha pública de un complejo habilitado con su clima, en una sola consulta que combina las dos fuentes del sistema:
+
+- **API principal (PostgreSQL):** los mismos datos que `GET /api/complejos/<id>/`, con sus canchas activas. Un complejo inexistente o sin contrato activo responde con el mismo `404` que REST.
+- **Servicio complementario:** el campo `clima`, el mismo de `GET /api/externa/clima/<id>` (clima actual y pronóstico de tres días, con la fuente que se debe citar).
+
+Argumento obligatorio: `id`. No requiere sesión.
+
+```graphql
+query {
+  detalleComplejo(id: 4) {
+    nombre direccion precioDesde
+    canchas { nombre deporte { nombre } duracionTurnoMin precioBase }
+    clima { fuente actual { temperatura descripcion } pronostico { fecha temperaturaMax temperaturaMin } }
+  }
+}
+```
+
+- Expone los campos de `catalogoComplejos`, más `canchas` (`id`, `nombre`, `deporte`, `tipoSuperficie`, `tipoSuperficieNombre`, `cobertura`, `coberturaNombre`, `iluminacion`, `iluminacionNombre`, `duracionTurnoMin` y `precioBase`) y `clima` (`actual`, `pronostico` y `fuente`).
+- El clima es complementario: si el servicio que lo calcula no responde o tarda demasiado, `clima` llega `null` y el resto de la ficha llega completo, sin error. Solo se consulta si la consulta pide el campo `clima`.
 
 ### `misReservas`
 
@@ -446,9 +488,22 @@ mutation {
 - Devuelve la reserva creada con los mismos campos que `misReservas`.
 - Errores en `extensions.codigo`: `400` (turno inválido, pasado, fuera de la anticipación o complejo no habilitado), `401`, `403`, `409` (turno ocupado, turno fijo o excepción, con el mismo mensaje que REST) y `429`.
 
+### Por qué GraphQL además de REST
+
+- **Una sola ida y vuelta entre servicios:** mostrar un complejo con su clima por REST requiere dos pedidos a dos servicios distintos (`/api/complejos/<id>/` y `/api/externa/clima/<id>`). `detalleComplejo` los resuelve en uno, y si una de las fuentes falla la otra igual responde.
+- **El cliente elige los campos:** una tarjeta puede pedir solo el nombre, las canchas y la temperatura, y una ficha, todo. REST devuelve siempre la representación completa.
+- **Sin reglas duplicadas:** cada campo ejecuta la acción REST equivalente, así que permisos, validaciones, límites y auditoría son los mismos. REST sigue siendo la API principal de la aplicación y GraphQL, una capa de consulta encima.
+
+**Cómo probarlo.** En desarrollo, `GET /graphql/` abre GraphiQL, un editor con autocompletado. En cualquier entorno se puede enviar la consulta con `curl`:
+
+```bash
+curl -X POST https://<dominio>/graphql/ -H "Content-Type: application/json" \
+  -d '{"query": "{ detalleComplejo(id: 4) { nombre clima { actual { temperatura } } } }"}'
+```
+
 ## Servicio complementario (Node)
 
-Servicio de actividad y notificaciones, con su propia URL base. Sus errores siguen la forma `{ "error": true, "mensaje": "..." }`; los de validación suman `detalles`.
+Servicio de actividad y notificaciones, con su propia URL base. Su documentación interactiva está en `GET /api/docs-node/` (ver la sección "Documentación interactiva"). Sus errores siguen la forma `{ "error": true, "mensaje": "..." }` y los de validación suman `detalles`.
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|

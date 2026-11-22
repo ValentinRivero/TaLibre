@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { t } from '../i18n/index.js';
 import Cargando from './Cargando.jsx';
 import SubnavegacionPanel from './SubnavegacionPanel.jsx';
@@ -16,12 +16,10 @@ const SECCIONES = [
 
 /** Estructura de `/sistema/*` (superadmin): subnavegación entre cuentas, roles, contratos, deportes, servicios, notificaciones y auditoría, y la subvista activa. */
 export default function LayoutSistema() {
-  const { pathname } = useLocation();
-
   return (
     <div>
       <SubnavegacionPanel secciones={SECCIONES.map(({ a, texto }) => ({ a, texto: t(texto) }))} />
-      <Suspense key={pathname} fallback={<Cargando variante="seccion" />}>
+      <Suspense fallback={<Cargando variante="seccion" />}>
         <Outlet />
       </Suspense>
     </div>

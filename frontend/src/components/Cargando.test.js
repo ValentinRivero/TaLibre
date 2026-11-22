@@ -29,6 +29,13 @@ describe('Cargando: animación de pelotas en las variantes grandes', () => {
     expect(html({ variante: 'pantalla' })).not.toContain('cargando-pelotas-chica');
   });
 
+  it('la variante superpuesta agrupa la animación y la leyenda para dejarlas fijas a la vista sobre el velo', () => {
+    const salida = html({ variante: 'superpuesto' });
+
+    expect(salida).toMatch(/^<div role="status" class="cargando-superpuesto"><div class="cargando-superpuesto-centro"><picture/);
+    expect(html({ variante: 'pantalla' })).not.toContain('cargando-superpuesto-centro');
+  });
+
   it('sin texto propio usa la leyenda común', () => {
     expect(html({ variante: 'superpuesto' })).toContain('Cargando...');
   });

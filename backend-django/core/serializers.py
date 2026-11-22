@@ -4,6 +4,7 @@ import unicodedata
 from decimal import Decimal
 
 import nh3
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .catalogo_notificaciones import (
@@ -58,6 +59,16 @@ from .models import (
     TipoMotivoExcepcion,
     TurnoFijo,
     Usuario,
+)
+from .openapi import (
+    CONTACTO,
+    DATOS_TRANSFERENCIA_COMPLEJO,
+    FECHA_HORA,
+    FECHAS_EN_ESPERA,
+    MOTIVO_OPCIONAL,
+    REFERENCIA,
+    REFERENCIAS,
+    TRANSFERENCIA_INFORMADA,
 )
 from .repositories import CanchaRepository, CatalogoRepository, ComplejoRepository, RolRepository, UsuarioRepository
 from .services import (
@@ -341,6 +352,7 @@ class UsoDeporteSerializer(serializers.Serializer):
     complejo_nombre = serializers.CharField(source='nombre', read_only=True)
     canchas = serializers.SerializerMethodField()
 
+    @extend_schema_field(REFERENCIAS)
     def get_canchas(self, complejo):
         return [{'id': cancha.id, 'nombre': cancha.nombre} for cancha in complejo.canchas_del_deporte]
 
@@ -394,7 +406,7 @@ class PermisoAdminSerializer(serializers.Serializer):
     modulo = serializers.CharField(read_only=True)
     asignable = serializers.SerializerMethodField(help_text='False si es exclusivo de la plataforma.')
 
-    def get_asignable(self, permiso):
+    def get_asignable(self, permiso) -> bool:
         return RolAdminService.es_asignable(permiso)
 
 
@@ -419,7 +431,7 @@ class RolAdminSerializer(serializers.Serializer):
     fecha_creacion = serializers.DateTimeField(read_only=True)
     fecha_modificacion = serializers.DateTimeField(read_only=True)
 
-    def get_es_base(self, rol):
+    def get_es_base(self, rol) -> bool:
         return rol.nombre in ROLES_BASE
 
 
@@ -518,9 +530,11 @@ class ComplejoCatalogoSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    @extend_schema_field(REFERENCIAS)
     def get_servicios(self, complejo):
         return _servicios_activos(complejo)
 
+    @extend_schema_field(REFERENCIAS)
     def get_deportes(self, complejo):
         deportes = {cancha.deporte_id: cancha.deporte.nombre for cancha in complejo.canchas_activas}
         return [
@@ -547,6 +561,7 @@ class ComplejoDetallePublicoSerializer(ComplejoCatalogoSerializer):
         fields = (*ComplejoCatalogoSerializer.Meta.fields, 'canchas')
         read_only_fields = fields
 
+    @extend_schema_field(CanchaPublicaSerializer(many=True))
     def get_canchas(self, complejo):
         return CanchaPublicaSerializer(complejo.canchas_activas, many=True).data
 
@@ -578,6 +593,7 @@ class ComplejoAdminSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    @extend_schema_field(REFERENCIAS)
     def get_servicios(self, complejo):
         return _servicios_activos(complejo)
 
@@ -1007,9 +1023,10 @@ class PagoReservaSerializer(serializers.ModelSerializer):
     transferencia_rechazada = serializers.BooleanField(read_only=True)
     transferencia = serializers.SerializerMethodField()
 
-    def get_estado_pago_nombre(self, reserva):
+    def get_estado_pago_nombre(self, reserva) -> str:
         return EstadoPago(reserva.estado_pago).label
 
+    @extend_schema_field(TRANSFERENCIA_INFORMADA)
     def get_transferencia(self, reserva):
         """Lo que el jugador informó al transferir la seña; solo lo ven el titular y el personal de ese complejo."""
         if not reserva.transferencia_informada:
@@ -1065,15 +1082,19 @@ class ReservaPropiaSerializer(PagoReservaSerializer):
         )
         read_only_fields = fields
 
+    @extend_schema_field(REFERENCIA)
     def get_complejo(self, reserva):
         return {'id': reserva.cancha.complejo_id, 'nombre': reserva.cancha.complejo.nombre}
 
+    @extend_schema_field(REFERENCIA)
     def get_cancha(self, reserva):
         return {'id': reserva.cancha_id, 'nombre': reserva.cancha.nombre}
 
+    @extend_schema_field(FECHA_HORA)
     def get_cancelable_hasta(self, reserva):
         return serializers.DateTimeField().to_representation(ReservaService.limite_de_cancelacion(reserva))
 
+    @extend_schema_field(DATOS_TRANSFERENCIA_COMPLEJO)
     def get_datos_transferencia(self, reserva):
         if reserva.estado not in ESTADOS_RESERVA_SENABLES or reserva.estado_pago != EstadoPago.SENA_PENDIENTE:
             return None
@@ -1141,18 +1162,20 @@ class ReservaAgendaSerializer(PagoReservaSerializer):
         )
         read_only_fields = fields
 
+    @extend_schema_field(CONTACTO)
     def get_cliente(self, reserva):
         return _datos_de_contacto(reserva)
 
-    def get_puede_confirmar_sena(self, reserva):
+    def get_puede_confirmar_sena(self, reserva) -> bool:
         return ReservaService.motivo_sena_no_registrable(reserva) is None
 
-    def get_puede_registrar_pago(self, reserva):
+    def get_puede_registrar_pago(self, reserva) -> bool:
         return ReservaService.motivo_pago_no_registrable(reserva) is None
 
-    def get_puede_anular_cobro(self, reserva):
+    def get_puede_anular_cobro(self, reserva) -> bool:
         return reserva.monto_pagado > 0
 
+    @extend_schema_field(MOTIVO_OPCIONAL)
     def get_conflicto_operatoria(self, reserva):
         # El listado de la agenda lo trae anotado en SQL; una reserva suelta (alta, cambio de estado) se evalúa acá.
         if hasattr(reserva, 'motivo_conflicto'):
@@ -1229,12 +1252,15 @@ class TurnoFijoSerializer(CamposInmutablesMixin, serializers.ModelSerializer):
     def validate(self, attrs):
         return self.descartar_inmutables(attrs)
 
+    @extend_schema_field(CONTACTO)
     def get_cliente(self, turno_fijo):
         return _datos_de_contacto(turno_fijo)
 
+    @extend_schema_field(MOTIVO_OPCIONAL)
     def get_conflicto_operatoria(self, turno_fijo):
         return ConflictoOperatoriaService.motivo_de_turno_fijo(turno_fijo)
 
+    @extend_schema_field(FECHAS_EN_ESPERA)
     def get_fechas_en_espera(self, turno_fijo):
         # El listado las calcula para toda la página de una vez; el detalle, para un solo turno fijo.
         precalculadas = self.context.get('fechas_en_espera')

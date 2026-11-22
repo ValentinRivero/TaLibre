@@ -1,6 +1,6 @@
 """
-Cliente HTTP de backend-node para las rutas internas: el aviso de notificaciones (POST) y el estado del servicio
-(GET). Usa la biblioteca estándar: un único pedido con tiempo máximo, sin redirecciones y autenticado con la clave
+Cliente HTTP de backend-node para las rutas internas (el aviso de notificaciones y el estado del servicio) y para
+la ruta pública del clima, que consulta la API GraphQL. Usa la biblioteca estándar: un único pedido con tiempo máximo, sin redirecciones y autenticado con la clave
 compartida entre servicios. La URL y la clave salen de la configuración, nunca del pedido de un usuario.
 """
 import json
@@ -12,6 +12,7 @@ from django.conf import settings
 
 RUTA_NOTIFICACIONES = '/api/interno/notificaciones'
 RUTA_ESTADO = '/api/interno/estado'
+RUTA_CLIMA = '/api/externa/clima/{}'
 LARGO_MINIMO_DE_CLAVE = 32
 
 
@@ -32,15 +33,22 @@ class _SinRedirecciones(urllib.request.HTTPRedirectHandler):
 _abridor = urllib.request.build_opener(_SinRedirecciones)
 
 
-def _url_interna(ruta):
+def _url_de_node(ruta):
     base = (settings.NODE_API_URL or '').strip().rstrip('/')
-    clave = settings.INTERNAL_API_KEY or ''
     partes = urlsplit(base)
-    if partes.scheme not in ('http', 'https') or not partes.netloc or len(clave) < LARGO_MINIMO_DE_CLAVE:
+    if partes.scheme not in ('http', 'https') or not partes.netloc:
         raise NodeNoConfigurado()
     if base.endswith('/api'):
         base = base[:-len('/api')]
-    return f'{base}{ruta}', clave
+    return f'{base}{ruta}'
+
+
+def _url_interna(ruta):
+    clave = settings.INTERNAL_API_KEY or ''
+    url = _url_de_node(ruta)
+    if len(clave) < LARGO_MINIMO_DE_CLAVE:
+        raise NodeNoConfigurado()
+    return url, clave
 
 
 def _pedir(pedido):
@@ -80,3 +88,12 @@ def consultar_estado():
     """Estado de backend-node (memoria, latencia de MongoDB, actividad y fallas recientes) para el reporte de sistema."""
     url, clave = _url_interna(RUTA_ESTADO)
     return _consultar(url, clave)
+
+
+def consultar_clima(complejo_id):
+    """
+    Clima del complejo desde la ruta pública de backend-node, que ya lo cachea por complejo. No lleva la clave
+    interna ni el token del usuario: el clima no depende de quién lo pide.
+    """
+    url = _url_de_node(RUTA_CLIMA.format(int(complejo_id)))
+    return _pedir(urllib.request.Request(url, method='GET', headers={'Accept': 'application/json'}))

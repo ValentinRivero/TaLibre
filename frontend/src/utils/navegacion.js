@@ -9,3 +9,15 @@ export const enlaceActivo = (pathname, rutas) => {
   ));
   return coincidencias.reduce((mejor, ruta) => (mejor === null || ruta.length > mejor.length ? ruta : mejor), null);
 };
+
+const RUTA_PORTADA = '/';
+const PREFIJOS_PANEL = ['/panel', '/sistema'];
+
+/**
+ * Ancho de la plantilla para una ruta: la portada arma sus propias secciones a todo el ancho (`completo`), los paneles
+ * de administración usan el contenedor fluido (`panel`) y el resto, el contenedor estándar (`normal`).
+ */
+export const anchoDePlantilla = (pathname) => {
+  if (pathname === RUTA_PORTADA) return 'completo';
+  return PREFIJOS_PANEL.some((prefijo) => pathname === prefijo || pathname.startsWith(`${prefijo}/`)) ? 'panel' : 'normal';
+};

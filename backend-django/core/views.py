@@ -1,5 +1,7 @@
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.views import SpectacularJSONAPIView, SpectacularSwaggerSplitView
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -23,6 +25,7 @@ from .filters import (
     TurnoFijoFilter,
     UsuarioFilter,
 )
+from .openapi import ESTADO_SERVICIO, MENSAJE, OBJETO, TOKEN_ACCESO
 from .permissions import AdministraComplejo, TienePermisoRBAC
 from .serializers import (
     CanchaSerializer,
@@ -159,6 +162,7 @@ class VistaPublica(APIView):
 class SaludView(VistaPublica):
     throttle_classes = []
 
+    @extend_schema(responses=ESTADO_SERVICIO)
     def get(self, request):
         return Response({'estado': 'ok'})
 
@@ -166,6 +170,7 @@ class SaludView(VistaPublica):
 class RegistroView(VistaPublica):
     throttle_classes = [RegistroRateThrottle]
 
+    @extend_schema(request=RegistroSerializer, responses={201: PerfilSerializer})
     def post(self, request):
         serializer = RegistroSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -176,6 +181,7 @@ class RegistroView(VistaPublica):
 class LoginView(VistaPublica):
     throttle_classes = [LoginRateThrottle]
 
+    @extend_schema(request=LoginSerializer, responses=TOKEN_ACCESO)
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -191,6 +197,7 @@ class LoginView(VistaPublica):
 
 
 class RefreshView(VistaPublica):
+    @extend_schema(request=None, responses=TOKEN_ACCESO)
     def post(self, request):
         refresh = SesionService.rotar_refresh(request.COOKIES.get(NOMBRE_COOKIE_REFRESH))
         respuesta = Response({'access': str(refresh.access_token)})
@@ -199,6 +206,7 @@ class RefreshView(VistaPublica):
 
 
 class LogoutView(VistaPublica):
+    @extend_schema(request=None, responses={204: None})
     def post(self, request):
         SesionService.cerrar_sesion(
             request.COOKIES.get(NOMBRE_COOKIE_REFRESH),
@@ -214,6 +222,7 @@ class RecuperarContrasenaView(VistaPublica):
 
     throttle_classes = [RecuperarContrasenaRateThrottle]
 
+    @extend_schema(request=RecuperarContrasenaSerializer, responses=MENSAJE)
     def post(self, request):
         serializer = RecuperarContrasenaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -226,6 +235,7 @@ class RecuperarContrasenaView(VistaPublica):
 class RestablecerContrasenaView(VistaPublica):
     throttle_classes = [RestablecerContrasenaRateThrottle]
 
+    @extend_schema(request=RestablecerContrasenaSerializer, responses=MENSAJE)
     def post(self, request):
         serializer = RestablecerContrasenaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -246,6 +256,7 @@ class CambiarContrasenaView(APIView):
     permisos_requeridos = {'POST': ('editar_perfil_propio',)}
     throttle_classes = [CambiarContrasenaRateThrottle]
 
+    @extend_schema(request=CambiarContrasenaSerializer, responses=MENSAJE)
     def post(self, request):
         serializer = CambiarContrasenaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -268,9 +279,11 @@ class PerfilView(APIView):
     }
     http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
+    @extend_schema(responses=PerfilSerializer)
     def get(self, request):
         return Response(PerfilSerializer(request.user).data)
 
+    @extend_schema(request=PerfilEdicionSerializer, responses=PerfilSerializer)
     def patch(self, request):
         serializer = PerfilEdicionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -279,6 +292,7 @@ class PerfilView(APIView):
         )
         return Response(PerfilSerializer(usuario).data)
 
+    @extend_schema(responses={204: None})
     def delete(self, request):
         UsuarioService.desactivar_cuenta_propia(request.user, AuditoriaService.ip_de_request(request))
         respuesta = Response(status=status.HTTP_204_NO_CONTENT)
@@ -293,6 +307,7 @@ class PerfilBajaView(APIView):
     permisos_requeridos = {'GET': ('desactivar_perfil_propio',)}
     http_method_names = ['get', 'head', 'options']
 
+    @extend_schema(responses=OBJETO)
     def get(self, request):
         return Response(BajaDeCuentaService.vista_previa(request.user))
 
@@ -531,9 +546,11 @@ class PreferenciasNotificacionView(APIView):
     permission_classes = [TienePermisoRBAC]
     permisos_requeridos = {'GET': ('administrar_notificaciones',), 'PUT': ('administrar_notificaciones',)}
 
+    @extend_schema(responses=OBJETO)
     def get(self, request):
         return Response(PreferenciaNotificacionService.matriz())
 
+    @extend_schema(request=PreferenciasNotificacionSerializer, responses=OBJETO)
     def put(self, request):
         entrada = PreferenciasNotificacionSerializer(data=request.data)
         entrada.is_valid(raise_exception=True)
@@ -1017,6 +1034,7 @@ class ReporteDashboardView(APIView):
     permission_classes = [TienePermisoRBAC]
     permisos_requeridos = {'GET': ('ver_reportes',)}
 
+    @extend_schema(parameters=[FiltroReporteSerializer], responses=OBJETO)
     def get(self, request):
         filtros = FiltroReporteSerializer(data=request.query_params)
         filtros.is_valid(raise_exception=True)
@@ -1088,3 +1106,21 @@ class UsuarioViewSet(PermisosPorCampoMixin, mixins.ListModelMixin, mixins.Retrie
             usuario.pk, entrada.validated_data, request.user, AuditoriaService.ip_de_request(request),
         )
         return Response(UsuarioAdminSerializer(usuario).data)
+
+
+class _DocumentacionHabilitadaMixin:
+    """La documentación interactiva se puede apagar por entorno (`API_DOCS_HABILITADA`): apagada responde 404."""
+
+    @extend_schema(exclude=True)
+    def get(self, request, *args, **kwargs):
+        if not settings.API_DOCS_HABILITADA:
+            raise NotFound()
+        return super().get(request, *args, **kwargs)
+
+
+class EsquemaApiView(_DocumentacionHabilitadaMixin, SpectacularJSONAPIView):
+    """Esquema OpenAPI 3 de la API REST, sin las rutas entre servicios ni la administración."""
+
+
+class DocumentacionApiView(_DocumentacionHabilitadaMixin, SpectacularSwaggerSplitView):
+    """Swagger UI sobre el esquema. Sirve su JavaScript aparte, compatible con una política de contenido estricta."""
