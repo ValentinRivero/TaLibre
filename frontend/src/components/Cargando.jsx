@@ -1,21 +1,28 @@
+import pelotasAnimadas from '../assets/loader-pelotas.webp';
+import pelotaQuieta from '../assets/loader-pelotas-quieta.png';
 import { t } from '../i18n/index.js';
 
 /**
- * Único lugar que conoce el aspecto del indicador de carga. Para reemplazarlo por una imagen o una animación propia
- * alcanza con cambiar esta función (y, si hace falta, las reglas `.cargando-*` de tema.css): ningún otro archivo
- * depende de cómo se ve.
+ * Único lugar que conoce el aspecto de los indicadores de carga (este y la animación de abajo, más las reglas
+ * `.cargando-*` de tema.css): ningún otro archivo depende de cómo se ven. El circular queda para botones y textos,
+ * donde la animación no entra.
  */
-function Indicador({ chico = false }) {
-  return <span className={`cargando-indicador${chico ? ' cargando-indicador-chico' : ''}`} aria-hidden="true" />;
+function IndicadorChico() {
+  return <span className="cargando-indicador cargando-indicador-chico" aria-hidden="true" />;
 }
 
 /**
- * Indicador de la carga entre pantallas (variante `superpuesto`). Está separado del spinner de botones y secciones
- * para poder reemplazarlo por una imagen o una animación propia sin tocar el resto: alcanza con cambiar esta función
- * y las reglas `.cargando-transicion` de tema.css.
+ * Animación de las variantes grandes: una pelota que gira y se transforma en la siguiente (tenis, fútbol, básquet y
+ * vóley). Si el sistema pide reducir el movimiento, el navegador elige la imagen quieta. Es decorativa: el estado lo
+ * anuncia la leyenda.
  */
-function IndicadorTransicion() {
-  return <span className="cargando-transicion" aria-hidden="true" />;
+function AnimacionPelotas({ chica = false }) {
+  return (
+    <picture className={`cargando-pelotas${chica ? ' cargando-pelotas-chica' : ''}`} aria-hidden="true">
+      <source media="(prefers-reduced-motion: reduce)" srcSet={pelotaQuieta} />
+      <img src={pelotasAnimadas} alt="" width="144" height="144" decoding="async" />
+    </picture>
+  );
 }
 
 /**
@@ -34,25 +41,17 @@ export default function Cargando({ variante = 'seccion', texto, className = '' }
   if (variante === 'boton' || variante === 'inline') {
     return (
       <span role="status" className={`d-inline-flex align-items-center gap-2 ${className}`.trim()}>
-        <Indicador chico />
+        <IndicadorChico />
         {variante === 'inline' ? <span>{leyenda}</span> : <span className="visually-hidden">{leyenda}</span>}
       </span>
     );
   }
 
-  if (variante === 'superpuesto') {
-    return (
-      <div role="status" className={`cargando-superpuesto ${className}`.trim()}>
-        <IndicadorTransicion />
-        <span className="visually-hidden">{leyenda}</span>
-      </div>
-    );
-  }
-
+  const contenedor = { superpuesto: 'cargando-superpuesto', pantalla: 'cargando-pantalla' }[variante] ?? 'cargando-seccion';
   return (
-    <div role="status" className={`${variante === 'pantalla' ? 'cargando-pantalla' : 'cargando-seccion'} ${className}`.trim()}>
-      <Indicador />
-      <span>{leyenda}</span>
+    <div role="status" className={`${contenedor} ${className}`.trim()}>
+      <AnimacionPelotas chica={contenedor === 'cargando-seccion'} />
+      <span className="cargando-leyenda">{leyenda}</span>
     </div>
   );
 }
