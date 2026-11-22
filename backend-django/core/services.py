@@ -78,6 +78,7 @@ from .repositories import (
 
 logger_seguridad = logging.getLogger('seguridad')
 logger_correo = logging.getLogger('core.correo')
+logger_integracion = logging.getLogger('core.integracion')
 
 ROL_SUPERADMIN = 'SUPERADMIN'
 ROL_DUENO = 'DUENO_COMPLEJO'
@@ -3702,6 +3703,22 @@ class AvisoComplejoService:
                 'Aviso para %s sin entregar: backend-node %s. Categoría %s, prioridad %s. %s',
                 _destino(aviso), error, aviso['categoria'], aviso['prioridad'], aviso['mensaje'],
             )
+
+
+class ClimaComplejoService:
+    @staticmethod
+    def consultar(complejo_id):
+        """
+        Clima del complejo para la ficha pública en GraphQL. Es un dato complementario: si backend-node no está
+        configurado o no responde a tiempo, devuelve None y el resto de la ficha se entrega igual.
+        """
+        try:
+            return node_client.consultar_clima(complejo_id)
+        except node_client.NodeNoConfigurado:
+            return None
+        except node_client.NodeNoDisponible as error:
+            logger_integracion.warning('Clima del complejo %s no disponible: backend-node %s.', complejo_id, error)
+            return None
 
 
 def _frase_de_reservas(ids):

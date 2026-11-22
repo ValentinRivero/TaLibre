@@ -1,4 +1,8 @@
+import json
+import threading
+import time
 from datetime import timedelta
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from django.test import Client
@@ -670,3 +674,177 @@ class TestEndurecimientoDeGraphQL:
 
         log = LogAuditoria.objects.get(usuario=operador, tipo_evento=TipoEventoAuditoria.ACCESO_DENEGADO)
         assert log.accion == 'GET /graphql/misReservas'
+
+
+DETALLE = '''
+query Detalle($id: Int!) {
+  detalleComplejo(id: $id) {
+    id nombre direccion telefonoContacto porcentajeSena precioDesde
+    servicios { id nombre }
+    deportes { id nombre }
+    canchas { id nombre deporte { id nombre } coberturaNombre duracionTurnoMin precioBase }
+    clima {
+      fuente
+      actual { temperatura descripcion esDeDia }
+      pronostico { fecha temperaturaMax temperaturaMin probabilidadLluvia }
+    }
+  }
+}
+'''
+
+DETALLE_SIN_CLIMA = '''
+query Detalle($id: Int!) { detalleComplejo(id: $id) { id nombre canchas { nombre } } }
+'''
+
+CLIMA_DE_NODE = {
+    'complejo': {'id': 0, 'nombre': 'Los Timbós'},
+    'actual': {
+        'fecha_hora': '2026-11-22T15:00', 'temperatura': 27.4, 'codigo_clima': 2, 'descripcion': 'Parcialmente nublado',
+        'viento_kmh': 12.6, 'precipitacion_mm': 0, 'es_de_dia': True,
+    },
+    'pronostico': [{
+        'fecha': '2026-11-22', 'codigo_clima': 2, 'descripcion': 'Parcialmente nublado',
+        'temperatura_max': 29.1, 'temperatura_min': 18.2, 'probabilidad_lluvia': None,
+    }],
+    'fuente': 'Open-Meteo.com',
+}
+
+
+class ClimaSimulado:
+    """backend-node real en un hilo, solo con la ruta pública del clima: registra cada pedido y responde lo indicado."""
+
+    def __init__(self):
+        self.pedidos = []
+        self.estado = 200
+        self.cuerpo = CLIMA_DE_NODE
+        self.demora = 0
+        simulado = self
+
+        class Manejador(BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                simulado.pedidos.append({'ruta': self.path, 'encabezados': dict(self.headers)})
+                time.sleep(simulado.demora)
+                contenido = json.dumps(simulado.cuerpo).encode()
+                self.send_response(simulado.estado)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(contenido)))
+                self.end_headers()
+                self.wfile.write(contenido)
+
+            def log_message(self, *args):
+                pass
+
+        self.servidor = ThreadingHTTPServer(('127.0.0.1', 0), Manejador)
+        self.url = f'http://127.0.0.1:{self.servidor.server_port}'
+        self.hilo = threading.Thread(target=self.servidor.serve_forever, kwargs={'poll_interval': 0.05}, daemon=True)
+
+    def __enter__(self):
+        self.hilo.start()
+        return self
+
+    def __exit__(self, *args):
+        self.servidor.shutdown()
+        self.servidor.server_close()
+
+
+@pytest.fixture
+def node_clima(settings):
+    with ClimaSimulado() as simulado:
+        settings.NODE_API_URL = f'{simulado.url}/api'
+        settings.INTERNAL_API_KEY = ''
+        yield simulado
+
+
+@pytest.mark.django_db
+class TestDetalleComplejo:
+    def test_combina_la_ficha_de_postgresql_con_el_clima_de_node(self, cliente, catalogo, node_clima):
+        respuesta = _consultar(cliente, DETALLE, id=catalogo['timbos'].id)
+
+        assert respuesta.status_code == status.HTTP_200_OK
+        detalle = respuesta.json()['data']['detalleComplejo']
+        assert detalle['nombre'] == 'Los Timbós'
+        assert [cancha['nombre'] for cancha in detalle['canchas']] == ['Pádel 1']
+        assert detalle['canchas'][0]['deporte']['nombre'] == 'Pádel'
+        assert detalle['clima']['fuente'] == 'Open-Meteo.com'
+        assert detalle['clima']['actual'] == {'temperatura': 27.4, 'descripcion': 'Parcialmente nublado', 'esDeDia': True}
+        assert detalle['clima']['pronostico'][0]['probabilidadLluvia'] is None
+
+    def test_pide_el_clima_a_la_ruta_publica_de_node_sin_credenciales(self, catalogo, node_clima, jugador):
+        token = TokenConRolSerializer.get_token(jugador).access_token
+
+        _consultar(_con_token(token), DETALLE, id=catalogo['ceibo'].id)
+
+        assert [pedido['ruta'] for pedido in node_clima.pedidos] == [f'/api/externa/clima/{catalogo["ceibo"].id}']
+        encabezados = {nombre.lower() for nombre in node_clima.pedidos[0]['encabezados']}
+        assert 'authorization' not in encabezados
+        assert 'x-internal-key' not in encabezados
+
+    def test_los_datos_comunes_son_los_mismos_que_la_ficha_rest(self, cliente, catalogo, node_clima):
+        ceibo = catalogo['ceibo']
+        rest = APIClient().get(f'{URL_REST}{ceibo.id}/').json()
+
+        detalle = _consultar(cliente, DETALLE, id=ceibo.id).json()['data']['detalleComplejo']
+
+        assert detalle['id'] == rest['id']
+        assert detalle['direccion'] == rest['direccion']
+        assert detalle['precioDesde'] == rest['precio_desde']
+        assert detalle['servicios'] == rest['servicios']
+        assert [cancha['id'] for cancha in detalle['canchas']] == [cancha['id'] for cancha in rest['canchas']]
+
+    def test_sin_pedir_el_clima_no_llama_a_node(self, cliente, catalogo, node_clima):
+        respuesta = _consultar(cliente, DETALLE_SIN_CLIMA, id=catalogo['timbos'].id)
+
+        assert respuesta.json()['data']['detalleComplejo']['nombre'] == 'Los Timbós'
+        assert node_clima.pedidos == []
+
+    @pytest.mark.parametrize('falla', ['error', 'lento'])
+    def test_si_node_falla_o_tarda_el_clima_es_nulo_y_la_ficha_llega_igual(
+        self, cliente, catalogo, node_clima, settings, falla,
+    ):
+        if falla == 'error':
+            node_clima.estado = 502
+        else:
+            settings.NODE_TIMEOUT_SEGUNDOS = 1
+            node_clima.demora = 1.5
+
+        cuerpo = _consultar(cliente, DETALLE, id=catalogo['timbos'].id).json()
+
+        assert 'errors' not in cuerpo
+        assert cuerpo['data']['detalleComplejo']['nombre'] == 'Los Timbós'
+        assert cuerpo['data']['detalleComplejo']['clima'] is None
+
+    def test_sin_node_configurado_el_clima_es_nulo(self, cliente, catalogo, settings):
+        settings.NODE_API_URL = ''
+
+        detalle = _consultar(cliente, DETALLE, id=catalogo['timbos'].id).json()['data']['detalleComplejo']
+
+        assert detalle['clima'] is None
+        assert detalle['canchas']
+
+    def test_un_complejo_suspendido_o_inexistente_responde_404_como_en_rest(self, cliente, catalogo, node_clima):
+        from core.models import Complejo
+
+        suspendido = Complejo.objects.get(nombre='Complejo Suspendido')
+        for complejo_id in (suspendido.id, 999_999):
+            cuerpo = _consultar(cliente, DETALLE, id=complejo_id).json()
+
+            assert cuerpo['data']['detalleComplejo'] is None
+            assert cuerpo['errors'][0]['extensions']['codigo'] == status.HTTP_404_NOT_FOUND
+        assert node_clima.pedidos == []
+
+    def test_no_expone_datos_del_propietario(self, cliente, catalogo):
+        consulta = 'query D($id: Int!) { detalleComplejo(id: $id) { propietario { email } } }'
+
+        respuesta = _consultar(cliente, consulta, id=catalogo['timbos'].id)
+
+        assert 'propietario' in respuesta.json()['errors'][0]['message']
+
+    def test_entra_en_la_profundidad_maxima(self, cliente, catalogo):
+        consulta = (
+            'query D($id: Int!) { detalleComplejo(id: $id) '
+            '{ canchas { deporte { id } } clima { actual { temperatura } } } }'
+        )
+
+        respuesta = _consultar(cliente, consulta, id=catalogo['timbos'].id)
+
+        assert 'errors' not in respuesta.json()
