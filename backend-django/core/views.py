@@ -707,7 +707,7 @@ class CanchaViewSet(PermisosPorCampoMixin, AccesoComplejoMixin, viewsets.ModelVi
             )
 
     def perform_destroy(self, instance):
-        CanchaService.dar_de_baja(instance)
+        CanchaService.dar_de_baja(instance, self.request.user, AuditoriaService.ip_de_request(self.request))
 
 
 class HorarioAperturaViewSet(PermisosPorCampoMixin, AccesoComplejoMixin, viewsets.ModelViewSet):
