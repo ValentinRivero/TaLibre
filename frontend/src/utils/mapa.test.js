@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { PARAMETROS } from '../config/parametros.js';
 import {
   armarMarcadores, esClicSimple, htmlAtribucion, htmlAtribuciones, limitesDe, rutaDeComplejo,
 } from './mapa.js';
@@ -77,7 +78,7 @@ describe('limitesDe', () => {
 
 describe('htmlAtribucion y htmlAtribuciones', () => {
   const osm = { texto: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright', licencia: 'ODbL' };
-  const esri = { texto: 'Tiles © Esri', url: 'https://www.esri.com/', licencia: 'Esri World Street Map' };
+  const otraFuente = { texto: 'Datos de ejemplo', url: 'https://example.org/', licencia: 'CC0 1.0' };
 
   test('enlaza al sitio, con la licencia en el title y sin exponer al opener', () => {
     const html = htmlAtribucion(osm);
@@ -97,11 +98,24 @@ describe('htmlAtribucion y htmlAtribuciones', () => {
   });
 
   test('junta las atribuciones de una capa, una por proveedor', () => {
-    const html = htmlAtribuciones([osm, esri]);
+    const html = htmlAtribuciones([osm, otraFuente]);
 
     expect(html.match(/<a /g)).toHaveLength(2);
-    expect(html).toContain('title="Esri World Street Map"');
+    expect(html).toContain('title="CC0 1.0"');
     expect(htmlAtribuciones([])).toBe('');
+  });
+});
+
+describe('capa de calles configurada', () => {
+  test('pide las teselas de OpenStreetMap por HTTPS con la URL exacta de su política de uso', () => {
+    expect(PARAMETROS.mapa.teselas.url).toBe('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+  });
+
+  test('atribuye a OpenStreetMap con su enlace de derechos de autor', () => {
+    const html = htmlAtribuciones(PARAMETROS.mapa.atribuciones);
+
+    expect(html).toContain('href="https://www.openstreetmap.org/copyright"');
+    expect(html).toContain('>© OpenStreetMap contributors</a>');
   });
 });
 
