@@ -90,6 +90,8 @@ export default function FormularioRegistro({
               label={(
                 <>
                   {t('registro.aceptoPoliticaAntes')}
+                  <Link to="/terminos" target="_blank" rel="noopener">{t('registro.aceptoTerminosLink')}</Link>
+                  {t('registro.aceptoPoliticaEntre')}
                   <Link to="/privacidad" target="_blank" rel="noopener">{t('registro.aceptoPoliticaLink')}</Link>
                 </>
               )}

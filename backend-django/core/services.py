@@ -1379,16 +1379,23 @@ class CanchaService:
             raise ValidationError({'nombre': MENSAJE_NOMBRE_CANCHA_REPETIDO})
 
     @staticmethod
-    def crear(datos):
+    def crear(datos, actor=None, ip_origen=None):
+        """Se audita solo el alta concretada, con el mismo evento y formato que la baja."""
         CanchaService._validar_nombre(datos['complejo'].pk, datos['nombre'])
         try:
             with transaction.atomic():
                 cancha = CanchaRepository.crear(**datos)
                 DifusionGrillaService.programar_operatoria(cancha.complejo_id, cancha.pk)
-                return cancha
         except IntegrityError:
             # Alta simultánea con el mismo nombre: la restricción uq_cancha_nombre_activa decide.
             raise ValidationError({'nombre': MENSAJE_NOMBRE_CANCHA_REPETIDO})
+
+        AuditoriaService.registrar(
+            TipoEventoAuditoria.CAMBIO_CONFIGURACION, 'Alta de cancha',
+            detalle=f'Cancha id {cancha.pk} «{cancha.nombre}».',
+            usuario=actor, complejo=cancha.complejo_id, ip_origen=ip_origen,
+        )
+        return cancha
 
     @staticmethod
     def actualizar(cancha, datos, confirmar=False, actor=None, ip_origen=None):

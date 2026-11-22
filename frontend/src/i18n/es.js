@@ -83,6 +83,7 @@ const es = {
     },
     legal: 'Legal',
     privacidad: 'Privacidad y Protección de datos',
+    terminos: 'Términos y condiciones',
     version: 'v-%version%',
     contacto: 'Contacto',
     correo: 'Escribinos',
@@ -114,9 +115,11 @@ const es = {
     ayudaTelefono: 'Lo usa el complejo para contactarte por una reserva. Solo números, espacios, guiones, paréntesis y un + inicial.',
     password: 'Contraseña',
     ayudaPassword: 'Entre %minimo% y %maximo% caracteres: letras sin tildes ni ñ, números y estos símbolos: %simbolos%',
-    aceptoPoliticaAntes: 'Leí y acepto la ',
-    aceptoPoliticaLink: 'política de privacidad',
-    debeAceptar: 'Para crear la cuenta tenés que aceptar la política de privacidad.',
+    aceptoPoliticaAntes: 'Leí y acepto los ',
+    aceptoTerminosLink: 'Términos y condiciones',
+    aceptoPoliticaEntre: ' y la ',
+    aceptoPoliticaLink: 'Política de privacidad',
+    debeAceptar: 'Para crear la cuenta tenés que aceptar los Términos y condiciones y la Política de privacidad.',
     enviar: 'Crear cuenta',
     creando: 'Creando la cuenta',
     conCuenta: '¿Ya tenés cuenta?',
@@ -128,9 +131,10 @@ const es = {
     sinAccesoDetalle: 'Tu rol (%rol%) no incluye esta pantalla. Si necesitás acceder, comunicate con el administrador del sistema.',
   },
   politica: {
-    titulo: 'Actualizamos la política de privacidad',
-    descripcion: 'Para seguir usando TaLibre tenés que aceptar la versión %version% de la política de privacidad.',
-    leer: 'Leer la política',
+    titulo: 'Actualizamos nuestros términos y nuestra política de privacidad',
+    descripcion: 'Para seguir usando TaLibre tenés que aceptar la versión %version% de los Términos y condiciones de uso y de la Política de privacidad.',
+    leer: 'Leer la Política de privacidad',
+    leerTerminos: 'Leer los Términos y condiciones',
     aceptar: 'Aceptar y continuar',
     aceptando: 'Guardando',
     cerrarSesion: 'Cerrar sesión',
@@ -156,7 +160,7 @@ const es = {
         [
           'Nombre, email y teléfono de tu cuenta',
           'Base de datos de usuarios',
-          'Identificar tu cuenta, iniciar sesión y contactarte por una reserva',
+          'Identificar tu cuenta, iniciar sesión, enviarte los correos de seguridad de tu cuenta y contactarte por una reserva',
           'Vos, el complejo donde reservás y el superadministrador de la plataforma',
         ],
         [
@@ -169,7 +173,7 @@ const es = {
           'Nombre y email del propietario de un complejo',
           'Base de datos de usuarios',
           'Identificar al titular del contrato del complejo',
-          'Solo el superadministrador; el catálogo público no lo muestra',
+          'Solo el superadministrador. El catálogo público no lo muestra',
         ],
         [
           'Nombre y teléfono de clientes cargados a mano',
@@ -184,10 +188,40 @@ const es = {
           'Quien administra ese complejo, hasta que la reserva se resuelve',
         ],
         [
+          'Alias, CBU o CVU y titular de la cuenta del complejo para recibir señas',
+          'Datos del complejo',
+          'Que transfieras la seña a la cuenta correcta',
+          'Quien reserva, solo mientras su seña está pendiente, y el personal del complejo. El catálogo público no los muestra',
+        ],
+        [
+          'Nombre de quien transfirió la seña y número de operación',
+          'Reservas',
+          'Que el complejo identifique tu transferencia antes de confirmar la seña. No pedimos DNI, CUIT ni datos bancarios',
+          'Vos y el personal del complejo donde reservaste',
+        ],
+        [
+          'Motivo y nota del rechazo de una transferencia',
+          'Reservas',
+          'Explicarte por qué tenés que informar de nuevo la transferencia',
+          'Vos y el personal de ese complejo',
+        ],
+        [
           'Dirección IP, identificador de usuario y tipo de evento',
           'Registro de auditoría y archivo de seguridad',
           'Seguridad: detectar accesos indebidos y fuerza bruta',
           'Solo el superadministrador',
+        ],
+        [
+          'Dirección IP desde la que pediste un código de recuperación y huella criptográfica del código',
+          'Registro de códigos de recuperación',
+          'Detectar abusos del restablecimiento de contraseña y verificar el código sin guardarlo',
+          'Nadie desde la aplicación',
+        ],
+        [
+          'Huella no reversible de tu correo y momento en que podés pedir otro código',
+          'Almacenamiento de la pestaña del navegador',
+          'Que la pantalla de recuperación recuerde que ya pediste un código',
+          'Solo esa pestaña, hasta que la cierres',
         ],
         [
           'Versión y fecha de aceptación de esta política',
@@ -212,7 +246,7 @@ const es = {
     destinatarios: {
       titulo: 'Destinatarios',
       texto:
-        'Cuando reservás, el complejo donde reservás recibe tu nombre y tu teléfono para gestionar el turno. No cedemos tus datos a otros terceros con fines comerciales.',
+        'Cuando reservás, el complejo donde reservás recibe tu nombre y tu teléfono para gestionar el turno y, si informás una transferencia, el nombre de quien transfirió y el número de operación. No cedemos tus datos a otros terceros con fines comerciales.',
     },
     proveedores: {
       titulo: 'Proveedores que alojan o procesan datos',
@@ -222,7 +256,9 @@ const es = {
         'Supabase: base de datos principal (PostgreSQL).',
         'MongoDB Atlas: registro de actividad y notificaciones.',
         'Microsoft Azure: alojamiento de los servidores.',
-        'Redis, si está habilitado: caché y mensajería en tiempo real.',
+        'Cloudflare: intermediario de red y protección del sitio. Procesa el tráfico entre tu navegador y nuestros servidores, incluida tu dirección IP.',
+        'Resend: envío de los correos de tu cuenta. Recibe tu dirección de correo y el contenido del mensaje.',
+        'Redis: caché y mensajería en tiempo real, dentro de nuestros propios servidores.',
         'Esri: el mapa de calles se descarga de sus servidores, que reciben la dirección IP de quien abre el mapa. Los datos de las calles provienen de OpenStreetMap.',
         'Open-Meteo: pronóstico del clima. Recibe solo las coordenadas del complejo, nunca datos tuyos.',
       ],
@@ -233,29 +269,130 @@ const es = {
         'Tu cuenta se conserva mientras esté activa. Si pedís la baja, tu nombre, email, teléfono y contraseña se anonimizan.',
         'La dirección IP de los registros de seguridad se anonimiza pasados %meses% meses.',
         'El nombre y el teléfono conservados por una reserva señada se borran cuando la reserva se resuelve o, como máximo, %dias% días después del turno.',
+        'Los códigos de recuperación de contraseña vencen a los %minutos% minutos y no se pueden volver a usar. La dirección IP del pedido se anonimiza a los %meses% meses.',
+        'La huella que guarda la pantalla de recuperación desaparece al cerrar la pestaña.',
         'Las sesiones vencidas se eliminan a diario.',
       ],
+    },
+    correos: {
+      titulo: 'Correos que te enviamos',
+      texto:
+        'Solo te escribimos por cuestiones de seguridad de tu cuenta, como el código para restablecer tu contraseña. No enviamos publicidad ni usamos tu correo para otros fines.',
+    },
+    seguridad: {
+      titulo: 'Seguridad de los datos',
+      texto:
+        'Aplicamos medidas técnicas y organizativas para proteger tus datos (art. 9 de la Ley 25.326): contraseñas guardadas con hash, conexión cifrada por HTTPS, sesión en una cookie inaccesible para los scripts de la página, permisos por rol, límites de intentos y un registro de auditoría que nunca guarda contraseñas, códigos ni correos tipeados.',
     },
     derechos: {
       titulo: 'Tus derechos',
       texto:
         'Podés acceder a tus datos, rectificarlos y solicitar su supresión. Podés consultar y editar tus datos desde tu perfil o escribiendo a %contacto%.',
       items: [
-        'Acceso: es gratuito, en intervalos no menores a seis meses, y respondemos dentro de los 10 días corridos.',
-        'Rectificación y supresión: respondemos dentro de los 5 días hábiles.',
+        'El titular de los datos personales tiene la facultad de ejercer el derecho de acceso a los mismos en forma gratuita a intervalos no inferiores a seis meses, salvo que se acredite un interés legítimo al efecto conforme lo establecido en el artículo 14, inciso 3 de la Ley Nº 25.326.',
         'Supresión con reservas señadas: no procede cuando perjudica derechos de terceros. Conservamos tu nombre y teléfono solo en esas reservas, hasta que se resuelvan.',
       ],
     },
     cookies: {
-      titulo: 'Cookies',
+      titulo: 'Cookies y almacenamiento del navegador',
       texto:
-        'Usamos una única cookie, estrictamente necesaria para mantener tu sesión. No usamos cookies de seguimiento ni de terceros.',
+        'Usamos una única cookie, estrictamente necesaria para mantener tu sesión. Además, el navegador guarda tu preferencia de modo claro u oscuro y, solo durante la recuperación de contraseña, la huella descripta más arriba. No usamos cookies de seguimiento, publicidad ni analítica de terceros.',
+    },
+    cambios: {
+      titulo: 'Cambios en esta política',
+      texto:
+        'Si modificamos esta política publicamos la nueva versión con su fecha de vigencia. Cuando el cambio es sustancial te pedimos que la aceptes de nuevo al ingresar, y si no estás de acuerdo podés solicitar la baja de tu cuenta.',
     },
     aaip: {
       titulo: 'Autoridad de control',
       texto:
         'La AGENCIA DE ACCESO A LA INFORMACIÓN PÚBLICA, en su carácter de Órgano de Control de la Ley N° 25.326, tiene la atribución de atender las denuncias y reclamos que interpongan quienes resulten afectados en sus derechos por incumplimiento de las normas vigentes en materia de protección de datos personales.',
     },
+    verTerminos: 'Las condiciones de uso del sitio, incluida la limitación de responsabilidad, están en los',
+    enlaceTerminos: 'Términos y condiciones de uso',
+  },
+  terminos: {
+    titulo: 'Términos y condiciones de uso',
+    version: 'Versión %version%, vigente desde el %fecha%.',
+    advertenciaTitulo: 'Sitio de demostración',
+    advertencia:
+      'TaLibre es un proyecto académico en etapa de demostración y no presta un servicio real. No deben realizarse transferencias ni pagos a los datos que aparecen en el sitio, y ninguna reserva, precio o turno debe tomarse como real.',
+    introduccion:
+      'Estos términos regulan el acceso y el uso de TaLibre. Al navegar el sitio o crear una cuenta, el usuario declara haberlos leído y aceptarlos junto con la Política de privacidad. Quien no esté de acuerdo debe abstenerse de usar el sitio.',
+    secciones: {
+      objeto: {
+        titulo: '1. Objeto y naturaleza del sitio',
+        parrafos: [
+          'TaLibre es un proyecto de trabajo final de la Tecnicatura Universitaria en Programación de la Universidad Tecnológica Nacional, Facultad Regional Resistencia. Se publica en etapa de demostración, sin fines de lucro y con el único objeto de exhibir su funcionamiento.',
+          'TaLibre no presta servicios reales de reserva, no comercializa turnos, no cobra comisiones, no procesa pagos y no mantiene relación comercial con los complejos que figuran en el sitio.',
+        ],
+      },
+      demostracion: {
+        titulo: '2. Datos de demostración',
+        parrafos: [
+          'Los complejos, canchas, horarios, precios, personas, teléfonos, direcciones, alias, CBU o CVU y demás datos visibles se cargaron con fines de demostración. En su gran mayoría son inventados, no pertenecen al equipo de TaLibre y cualquier coincidencia con personas, comercios o cuentas reales es casual.',
+          'Las ubicaciones del mapa son aproximadas y no corresponden necesariamente a establecimientos existentes.',
+          'Quien considere que un dato publicado le pertenece o lo afecta puede pedir su corrección o eliminación por el canal de contacto de la sección 10, y será retirado a la brevedad.',
+        ],
+      },
+      pagos: {
+        titulo: '3. Reservas, señas y pagos',
+        parrafos: [
+          'Las reservas, señas, cobros y estados de pago que muestra el sitio son simulaciones. Ninguna reserva genera obligaciones para el usuario, para TaLibre ni para los complejos que figuran en el sitio, y los turnos no se corresponden con canchas disponibles en la realidad.',
+          'No deben realizarse transferencias, depósitos ni pagos de ningún tipo a los alias, CBU o CVU que aparezcan en el sitio. TaLibre no recibe, administra ni reintegra dinero y no responde por transferencias realizadas pese a esta advertencia.',
+        ],
+      },
+      responsabilidad: {
+        titulo: '4. Limitación de responsabilidad',
+        parrafos: [
+          'El sitio se ofrece en el estado en que se encuentra y según su disponibilidad, sin garantía de funcionamiento continuo, de ausencia de errores ni de exactitud de la información publicada.',
+          'TaLibre no responde por daños directos o indirectos derivados del uso o de la imposibilidad de uso del sitio, de decisiones tomadas a partir de su contenido, de pagos realizados a terceros ni del contenido que carguen los usuarios.',
+          'El pronóstico del clima proviene de Open-Meteo y la cartografía de Esri con datos de OpenStreetMap. TaLibre no garantiza su exactitud ni su disponibilidad.',
+          'Nada de lo dispuesto en estos términos limita los derechos que la normativa de defensa del consumidor reconozca al usuario cuando resulte aplicable.',
+        ],
+      },
+      cuentas: {
+        titulo: '5. Cuentas y conducta del usuario',
+        parrafos: [
+          'El usuario es responsable de la veracidad de los datos que carga, de la confidencialidad de su contraseña y de la actividad realizada desde su cuenta.',
+          'Está prohibido cargar datos personales de terceros sin su consentimiento, suplantar identidades, publicar contenido ilícito u ofensivo y realizar acciones que afecten la seguridad o el funcionamiento del sitio, como accesos no autorizados, pruebas de carga o extracción automatizada de datos.',
+          'Por tratarse de un entorno de demostración, TaLibre puede moderar contenido, suspender o dar de baja cuentas y eliminar o reiniciar datos en cualquier momento y sin aviso previo, incluida la recarga periódica de los datos de ejemplo.',
+        ],
+      },
+      propiedad: {
+        titulo: '6. Propiedad intelectual',
+        parrafos: [
+          'El código, el diseño, el logo, los íconos y los textos de TaLibre son obra del equipo y están protegidos por la normativa de propiedad intelectual.',
+          'Los componentes de terceros se usan según sus licencias: la tipografía Barlow Semi Condensed bajo SIL Open Font License 1.1, Bootstrap bajo licencia MIT, Leaflet bajo licencia BSD, la cartografía de Esri con datos de OpenStreetMap bajo licencia ODbL y los datos del clima de Open-Meteo bajo licencia CC BY 4.0. Las marcas mencionadas pertenecen a sus titulares.',
+        ],
+      },
+      datos: {
+        titulo: '7. Datos personales',
+        parrafos: [
+          'El tratamiento de los datos personales se rige por la Política de privacidad, conforme a la Ley 25.326 de Protección de los Datos Personales.',
+        ],
+      },
+      modificaciones: {
+        titulo: '8. Modificaciones',
+        parrafos: [
+          'TaLibre puede modificar estos términos. La versión vigente se publica en esta página con su fecha. Cuando el cambio es sustancial se solicita una nueva aceptación al ingresar.',
+        ],
+      },
+      ley: {
+        titulo: '9. Ley aplicable',
+        parrafos: [
+          'Estos términos se rigen por las leyes de la República Argentina.',
+        ],
+      },
+      contacto: {
+        titulo: '10. Contacto',
+        parrafos: [
+          'Para consultas sobre estos términos, para pedir la corrección o eliminación de un dato o para reportar un uso indebido, el canal de contacto es el correo',
+        ],
+      },
+    },
+    leerPrivacidad: 'Leer la Política de privacidad',
+    asuntoContacto: 'Duda TaLibre',
   },
   catalogo: {
     listado: 'Complejos',
@@ -431,7 +568,7 @@ const es = {
     confirmar: 'Confirmar reserva',
     creadaTitulo: 'Reserva registrada',
     creadaSinSena: 'Tu turno quedó registrado. El complejo lo confirmará y te avisará.',
-    creadaSena: 'Transferí la seña al alias del complejo para asegurar tu turno. Después avisale desde "Mis reservas" con el número de operación; el complejo la confirma al verla en su cuenta.',
+    creadaSena: 'Transferí la seña al alias del complejo para asegurar tu turno. Después avisale desde "Mis reservas" con el número de operación. El complejo la confirma al verla en su cuenta.',
     desgloseTitulo: 'Montos del turno',
     desgloseSenaAviso: 'Para asegurar el turno transferís la seña ahora - el saldo se abona en el complejo.',
     verMisReservas: 'Ver mis reservas',
@@ -522,6 +659,8 @@ const es = {
     cbu: 'CBU o CVU',
     copiarCbu: 'Copiar CBU/CVU',
     titular: 'Titular',
+    avisoDemostracion: 'Datos de demostración: no transfieras dinero real.',
+    verTerminos: 'Ver los Términos y condiciones',
     copiarAlias: 'Copiar alias',
     aliasCopiado: 'Copiado',
     errorCopiar: 'No pudimos copiarlo. Seleccionalo y copialo a mano.',
@@ -1164,7 +1303,7 @@ const es = {
     sinDuenos: 'No hay dueños activos que coincidan con la búsqueda.',
     errorPropietario: 'Elegí el propietario del complejo.',
     estadoInicial: 'Estado inicial del contrato',
-    ayudaEstadoInicial: 'Pendiente no publica el complejo; activo lo publica en el catálogo.',
+    ayudaEstadoInicial: 'Pendiente no publica el complejo. Activo lo publica en el catálogo.',
     crear: 'Crear complejo',
     creando: 'Creando',
     avisoAlta: 'El complejo y su contrato quedaron registrados.',
@@ -1332,7 +1471,7 @@ const es = {
   },
   roles: {
     titulo: 'Roles',
-    descripcion: 'Roles del sistema y sus permisos. Los roles base están protegidos; los personalizados se crean con permisos operativos.',
+    descripcion: 'Roles del sistema y sus permisos. Los roles base están protegidos y los personalizados se crean con permisos operativos.',
     nuevo: 'Nuevo rol',
     buscar: 'Buscar por nombre o descripción',
     columnas: {

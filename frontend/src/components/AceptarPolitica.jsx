@@ -9,8 +9,7 @@ import { actualizarPerfil, logout } from '../services/authService.js';
 import Alerta from './Alerta.jsx';
 import BotonAccion from './BotonAccion.jsx';
 
-// En estas pantallas el diálogo no aparece: son las que permiten leer la política o pedir la baja.
-const RUTAS_LIBRES = ['/privacidad', '/perfil'];
+const { rutasSinAceptacion } = PARAMETROS.politica;
 
 /**
  * Diálogo bloqueante para el usuario autenticado que debe aceptar una versión nueva de la política de privacidad.
@@ -22,7 +21,7 @@ export default function AceptarPolitica() {
   const navegar = useNavigate();
   const [error, setError] = useState(null);
 
-  if (!autenticado || !debeAceptarPolitica || RUTAS_LIBRES.includes(pathname)) return null;
+  if (!autenticado || !debeAceptarPolitica || rutasSinAceptacion.includes(pathname)) return null;
 
   const aceptar = async () => {
     setError(null);
@@ -45,9 +44,10 @@ export default function AceptarPolitica() {
       </Modal.Header>
       <Modal.Body>
         <p>{t('politica.descripcion', { version: PARAMETROS.politica.version })}</p>
-        <p className="mb-2">
-          <Link to="/privacidad">{t('politica.leer')}</Link>
-        </p>
+        <ul className="list-unstyled mb-2">
+          <li className="mb-1"><Link to="/terminos">{t('politica.leerTerminos')}</Link></li>
+          <li><Link to="/privacidad">{t('politica.leer')}</Link></li>
+        </ul>
         <p className="small text-secondary mb-0">
           {t('politica.baja')} <Link to="/perfil">{t('politica.solicitarBaja')}</Link>
         </p>

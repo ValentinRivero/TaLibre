@@ -66,6 +66,9 @@ export default function PiePagina() {
             <h2 className="pie-pagina-titulo mt-4">{t('pie.legal')}</h2>
             <ul className="pie-pagina-lista">
               <li>
+                <Link to="/terminos" className="pie-pagina-enlace">{t('pie.terminos')}</Link>
+              </li>
+              <li>
                 <Link to="/privacidad" className="pie-pagina-enlace">{t('pie.privacidad')}</Link>
                 <span className="pie-pagina-nota"> - {politica.version}</span>
               </li>

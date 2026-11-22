@@ -31,7 +31,7 @@ export const PARAMETROS = Object.freeze({
   idioma: 'es',
   // Versión de la aplicación que muestra el pie de página: `0.<fase>.<ítem>` del plan (6.4 -> 0.6.4) hasta el despliegue,
   // cuando pasa a 1.0.0 (CLAUDE.md §8.8).
-  app: Object.freeze({ version: '0.7.2' }),
+  app: Object.freeze({ version: '0.7.5' }),
   formato: Object.freeze({ locale: 'es-AR', moneda: 'ARS' }),
   // Espejo de PAGE_SIZE de Django y del límite por defecto de Node.
   paginacion: Object.freeze({ tamanio: 20, botones: 5 }),
@@ -113,8 +113,10 @@ export const PARAMETROS = Object.freeze({
   }),
   // Espejo de POLITICA_PRIVACIDAD_VERSION de Django.
   politica: Object.freeze({
-    version: '1.0',
-    vigenteDesde: '2026-11-12',
+    version: '1.1',
+    vigenteDesde: '2026-11-22',
+    // Pantallas donde no aparece el diálogo de reaceptación: leer los términos y la política, o pedir la baja.
+    rutasSinAceptacion: Object.freeze(['/terminos', '/privacidad', '/perfil']),
     contacto: 'contactotalibre@irracional.net',
     // Espejos de AUDITORIA_RETENCION_MESES y CONTACTOS_BAJA_DIAS de Django.
     retencionIpMeses: 12,
