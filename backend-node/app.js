@@ -8,6 +8,7 @@ import { obtenerParametros } from './src/config/parametros.js';
 import { manejarErrores, rutaNoEncontrada } from './src/middlewares/errores.middleware.js';
 import { crearLimitadorGlobal } from './src/middlewares/rateLimit.middleware.js';
 import actividadRoutes from './src/routes/actividad.routes.js';
+import docsRoutes from './src/routes/docs.routes.js';
 import externoRoutes from './src/routes/externo.routes.js';
 import internoRoutes from './src/routes/interno.routes.js';
 import reporteAuxRoutes from './src/routes/reporteAux.routes.js';
@@ -34,6 +35,8 @@ app.use('/api/actividad', actividadRoutes);
 app.use('/api/reportes-aux', reporteAuxRoutes);
 app.use('/api/externa', externoRoutes);
 app.use('/api/interno', internoRoutes);
+// Documentación interactiva del contrato público. Sin /api/interno, que solo usa backend-django.
+app.use('/api/docs-node', docsRoutes);
 
 app.use(rutaNoEncontrada);
 app.use(manejarErrores);

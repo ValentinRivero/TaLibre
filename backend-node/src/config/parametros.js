@@ -49,6 +49,15 @@ const direccionHttp = (entorno, nombre, porDefecto) => {
   return texto;
 };
 
+const booleano = (entorno, nombre, porDefecto) => {
+  const crudo = entorno[nombre];
+  if (crudo === undefined || String(crudo).trim() === '') return porDefecto;
+  const texto = String(crudo).trim().toLowerCase();
+  if (['true', '1'].includes(texto)) return true;
+  if (['false', '0'].includes(texto)) return false;
+  throw new Error(`${nombre} debe ser true o false.`);
+};
+
 const limitador = (entorno, prefijo, ventanaPorDefecto, maximoPorDefecto) => Object.freeze({
   ventanaMs: entero(entorno, `${prefijo}_VENTANA_MS`, ventanaPorDefecto, { minimo: 1_000, maximo: 86_400_000 }),
   maximo: entero(entorno, `${prefijo}_MAXIMO`, maximoPorDefecto, { minimo: 1, maximo: 1_000_000 }),
@@ -79,6 +88,9 @@ export const leerParametros = (entorno) => Object.freeze({
     timeoutSeleccionMs: entero(entorno, 'MONGO_TIMEOUT_SELECCION_MS', 10_000, { minimo: 1_000, maximo: 60_000 }),
     maxPoolSize: entero(entorno, 'MONGO_MAX_POOL', 100, { minimo: 1, maximo: 500 }),
   }),
+  // Documentación interactiva (OpenAPI 3 y Swagger UI) en /api/docs-node. Describe el mismo contrato público que
+  // docs/API.md y nunca las rutas internas.
+  docsHabilitada: booleano(entorno, 'API_DOCS_HABILITADA', true),
   // Mismo tope que el dashboard de la API principal (RANGO_MAXIMO_DIAS), que muestra estas métricas junto a las suyas.
   rangoMaximoDias: entero(entorno, 'RANGO_MAXIMO_DIAS', 366, { minimo: 1, maximo: 3_660 }),
   // Umbrales desde los que `/api/interno/estado` se informa como degradado a backend-django.
