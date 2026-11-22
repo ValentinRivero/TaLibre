@@ -40,10 +40,13 @@ describe('Términos y condiciones de uso', () => {
     expect([...posiciones].sort((a, b) => a - b)).toEqual(posiciones);
   });
 
-  it('cita el marco normativo sin inventar artículos', () => {
+  it('solo cita por número la ley de datos personales y nombra el resto de la normativa en términos generales', () => {
     const texto = CLAVES_SECCIONES.flatMap((clave) => tLista(`terminos.secciones.${clave}.parrafos`)).join(' ');
 
-    ['Ley 25.326', '1558/2001', 'Ley 24.240', 'Ley 11.723', 'Ley 26.994'].forEach((norma) => expect(texto).toContain(norma));
+    expect(texto).toContain('Ley 25.326');
+    expect(texto.match(/Ley \d/g)).toHaveLength(1);
+    expect(texto).toContain('defensa del consumidor');
+    expect(texto).toContain('leyes de la República Argentina');
   });
 
   it('enlaza a la política de privacidad y al correo de contacto con el asunto codificado', () => {

@@ -348,7 +348,7 @@ const es = {
           'El sitio se ofrece en el estado en que se encuentra y según su disponibilidad, sin garantía de funcionamiento continuo, de ausencia de errores ni de exactitud de la información publicada.',
           'TaLibre no responde por daños directos o indirectos derivados del uso o de la imposibilidad de uso del sitio, de decisiones tomadas a partir de su contenido, de pagos realizados a terceros ni del contenido que carguen los usuarios.',
           'El pronóstico del clima proviene de Open-Meteo y la cartografía de Esri con datos de OpenStreetMap. TaLibre no garantiza su exactitud ni su disponibilidad.',
-          'Nada de lo dispuesto en estos términos limita los derechos que la Ley 24.240 de Defensa del Consumidor reconozca al usuario cuando resulte aplicable.',
+          'Nada de lo dispuesto en estos términos limita los derechos que la normativa de defensa del consumidor reconozca al usuario cuando resulte aplicable.',
         ],
       },
       cuentas: {
@@ -362,14 +362,14 @@ const es = {
       propiedad: {
         titulo: '6. Propiedad intelectual',
         parrafos: [
-          'El código, el diseño, el logo, los íconos y los textos de TaLibre son obra del equipo y están protegidos por la Ley 11.723 de Propiedad Intelectual.',
+          'El código, el diseño, el logo, los íconos y los textos de TaLibre son obra del equipo y están protegidos por la normativa de propiedad intelectual.',
           'Los componentes de terceros se usan según sus licencias: la tipografía Barlow Semi Condensed bajo SIL Open Font License 1.1, Bootstrap bajo licencia MIT, Leaflet bajo licencia BSD, la cartografía de Esri con datos de OpenStreetMap bajo licencia ODbL y los datos del clima de Open-Meteo bajo licencia CC BY 4.0. Las marcas mencionadas pertenecen a sus titulares.',
         ],
       },
       datos: {
         titulo: '7. Datos personales',
         parrafos: [
-          'El tratamiento de los datos personales se rige por la Política de privacidad, conforme a la Ley 25.326 de Protección de los Datos Personales y su Decreto reglamentario 1558/2001.',
+          'El tratamiento de los datos personales se rige por la Política de privacidad, conforme a la Ley 25.326 de Protección de los Datos Personales.',
         ],
       },
       modificaciones: {
@@ -381,7 +381,7 @@ const es = {
       ley: {
         titulo: '9. Ley aplicable',
         parrafos: [
-          'Estos términos se rigen por las leyes de la República Argentina, en particular por el Código Civil y Comercial de la Nación (Ley 26.994).',
+          'Estos términos se rigen por las leyes de la República Argentina.',
         ],
       },
       contacto: {
