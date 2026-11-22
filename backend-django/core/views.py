@@ -1,7 +1,7 @@
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerSplitView
+from drf_spectacular.views import SpectacularJSONAPIView, SpectacularSwaggerSplitView
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -1118,7 +1118,7 @@ class _DocumentacionHabilitadaMixin:
         return super().get(request, *args, **kwargs)
 
 
-class EsquemaApiView(_DocumentacionHabilitadaMixin, SpectacularAPIView):
+class EsquemaApiView(_DocumentacionHabilitadaMixin, SpectacularJSONAPIView):
     """Esquema OpenAPI 3 de la API REST, sin las rutas entre servicios ni la administración."""
 
 

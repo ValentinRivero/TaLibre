@@ -9,8 +9,9 @@ from .schema import schema
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/schema/', EsquemaApiView.as_view(), name='esquema-api'),
-    path('api/docs/', DocumentacionApiView.as_view(url_name='esquema-api'), name='documentacion-api'),
+    # Mismos nombres que backend-node (/api/docs-node/): la interfaz y, al lado, su especificación en JSON.
+    path('api/docs-django/openapi.json', EsquemaApiView.as_view(), name='esquema-api'),
+    path('api/docs-django/', DocumentacionApiView.as_view(url_name='esquema-api'), name='documentacion-api'),
     path('api/', include('core.urls')),
     # Sin CSRF: la autenticación viaja en el encabezado Authorization, nunca en una cookie de sesión.
     path('graphql/', csrf_exempt(JWTGraphQLView.as_view(schema=schema, graphiql=True))),

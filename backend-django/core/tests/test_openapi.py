@@ -5,8 +5,8 @@ from django.core.management import call_command
 from django.test import override_settings
 from rest_framework import status
 
-URL_ESQUEMA = '/api/schema/?format=json'
-URL_DOCUMENTACION = '/api/docs/'
+URL_ESQUEMA = '/api/docs-django/openapi.json'
+URL_DOCUMENTACION = '/api/docs-django/'
 
 pytestmark = pytest.mark.django_db
 
@@ -19,7 +19,8 @@ def esquema(cliente):
 
 
 class TestEsquemaOpenApi:
-    def test_es_publico_y_cumple_openapi_3(self, esquema):
+    def test_es_publico_y_cumple_openapi_3(self, cliente, esquema):
+        assert cliente.get(URL_ESQUEMA)['Content-Type'].startswith('application/vnd.oai.openapi+json')
         assert esquema['openapi'].startswith('3.')
         assert esquema['info']['title'] == 'TaLibre API'
 
@@ -34,8 +35,7 @@ class TestEsquemaOpenApi:
     def test_no_publica_rutas_entre_servicios_ni_la_administracion(self, esquema):
         for ruta in esquema['paths']:
             assert not ruta.startswith(('/api/interno', '/admin')), ruta
-        assert '/api/schema/' not in esquema['paths']
-        assert '/api/docs/' not in esquema['paths']
+        assert not any(ruta.startswith('/api/docs-django') for ruta in esquema['paths'])
 
     def test_declara_el_access_token_como_bearer_jwt(self, esquema):
         jwt = esquema['components']['securitySchemes']['jwtAuth']
