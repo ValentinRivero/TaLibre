@@ -10,6 +10,7 @@ import { t } from './i18n/index.js';
 import Catalogo from './pages/Catalogo.jsx';
 import Login from './pages/Login.jsx';
 import Privacidad from './pages/Privacidad.jsx';
+import Terminos from './pages/Terminos.jsx';
 import RecuperarContrasena from './pages/RecuperarContrasena.jsx';
 import Registro from './pages/Registro.jsx';
 
@@ -79,6 +80,7 @@ export default function App() {
           <Route path="/registro" element={<Registro />} />
           <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
           <Route path="/privacidad" element={<Privacidad />} />
+          <Route path="/terminos" element={<Terminos />} />
           <Route
             path="/mis-reservas"
             element={<ProtectedRoute seccion="misReservas"><MisReservas /></ProtectedRoute>}

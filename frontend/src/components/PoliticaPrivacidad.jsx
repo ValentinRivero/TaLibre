@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { PARAMETROS } from '../config/parametros.js';
 import { t } from '../i18n/index.js';
 import { formatearFechaLarga } from '../utils/formatos.js';
@@ -23,6 +24,9 @@ export default function PoliticaPrivacidad() {
         {t('privacidad.version', { version, fecha: formatearFechaLarga(vigenteDesde) })}
       </p>
       <p>{t('privacidad.introduccion')}</p>
+      <p>
+        {t('privacidad.verTerminos')} <Link to="/terminos">{t('privacidad.enlaceTerminos')}</Link>.
+      </p>
 
       <SeccionPolitica titulo={t('privacidad.responsable.titulo')}>
         <p>
