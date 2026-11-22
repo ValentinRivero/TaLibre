@@ -1,0 +1,159 @@
+# Entorno local completo de TaLibre: PostgreSQL, MongoDB y Redis en contenedores, los dos backends y nginx sirviendo el
+# frontend compilado, con las mismas rutas que produccion pero por HTTP y sin certificados.
+#
+#   docker compose -f docker-compose.local.yml up --build        (la aplicacion queda en http://localhost:8080)
+#   docker compose -f docker-compose.local.yml down -v           (baja todo y borra las bases)
+#
+# No se usa en produccion, que corre docker-compose.yml con sus variables fuera del repositorio. Todos los valores de
+# este archivo son ficticios y descartables: sirven solo para este entorno y no dan acceso a nada real.
+# Con DJANGO_DEBUG=True los correos transaccionales (codigos de recuperacion, avisos) se ven en los logs del servicio
+# web: docker compose -f docker-compose.local.yml logs -f web
+name: talibre-local
+
+x-claves-compartidas: &claves-compartidas
+  JWT_SIGNING_KEY: local-jwt-clave-ficticia-0123456789abcdef0123456789abcdef
+  INTERNAL_API_KEY: local-interna-clave-ficticia-0123456789abcdef
+  CORS_ALLOWED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+  NUM_PROXIES: "1"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: talibre
+      POSTGRES_PASSWORD: local-postgres-ficticia
+      POSTGRES_DB: talibre
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talibre -d talibre"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - interna
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - datos_mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - interna
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - interna
+
+  web:
+    build: ./backend-django
+    # Migraciones y datos de demostracion antes de levantar Daphne. seed_inicial es idempotente: un reinicio no duplica nada.
+    command:
+      - sh
+      - -c
+      - >-
+        python manage.py migrate --noinput &&
+        python manage.py seed_inicial &&
+        exec daphne -b 0.0.0.0 -p 8000 --ping-interval 20 --ping-timeout 30 config.asgi:application
+    environment:
+      <<: *claves-compartidas
+      DJANGO_SECRET_KEY: local-django-clave-ficticia-0123456789abcdef0123456789abcdef
+      DJANGO_DEBUG: "True"
+      SECURE_SSL_REDIRECT: "False"
+      # localhost primero: es el Host que usa healthcheck.py. web es el nombre con que lo consulta backend-node.
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
+      CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+      # El PostgreSQL del contenedor no tiene TLS: sin sslmode=disable la conexion exige cifrado y falla.
+      DATABASE_URL: postgres://talibre:local-postgres-ficticia@db:5432/talibre?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      NODE_API_URL: http://node:3000
+      SEED_PASSWORD_DEMO: DemoLocal2026
+      EMAIL_PROVEEDOR: consola
+      SECURITY_LOG_PATH: /var/log/talibre/security.log
+    volumes:
+      - seguridad_logs:/var/log/talibre
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 10s
+      timeout: 6s
+      retries: 5
+      # En frio corren las migraciones y el seed antes de que Daphne atienda: el chequeo no cuenta fallas mientras tanto.
+      start_period: 90s
+    networks:
+      - interna
+
+  node:
+    build: ./backend-node
+    environment:
+      <<: *claves-compartidas
+      MONGO_URI: mongodb://mongo:27017/talibre
+      DJANGO_API_URL: http://web:8000
+    depends_on:
+      mongo:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/salud"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - interna
+
+  nginx:
+    build:
+      context: ./frontend
+      additional_contexts:
+        configuracion_nginx: ./nginx
+      args:
+        VITE_API_DJANGO_URL: ""
+        VITE_API_NODE_URL: ""
+        VITE_WS_URL: ""
+    ports:
+      - "8080:80"
+    # La imagen es la misma que la de produccion: se reemplaza su sitio HTTPS por uno HTTP y se anula el filtro de
+    # rangos de Cloudflare, que aca rechazaria toda conexion.
+    volumes:
+      - ./nginx/local/talibre.local.conf:/etc/nginx/conf.d/10-talibre.conf:ro
+      - ./nginx/local/sin-cloudflare.conf:/etc/nginx/conf.d/00-cloudflare.conf:ro
+    depends_on:
+      web:
+        condition: service_healthy
+      node:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/nginx-salud"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - interna
+
+networks:
+  interna:
+    driver: bridge
+
+volumes:
+  datos_postgres:
+  datos_mongo:
+  seguridad_logs:
