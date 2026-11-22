@@ -17,9 +17,9 @@ jobs:
       JWT_SIGNING_KEY: ci-fedcba9876543210fedcba9876543210
       DJANGO_DEBUG: "False"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           cache: pip
@@ -27,6 +27,12 @@ jobs:
 
       - name: Instalar dependencias
         run: pip install -r requirements.txt
+
+      # ruff solo se usa en CI: no forma parte de las dependencias de la aplicacion ni entra en la imagen.
+      - name: Analizar el codigo
+        run: |
+          pip install ruff==0.17.6
+          ruff check . --output-format github
 
       - name: Verificar migraciones
         run: python manage.py makemigrations --check --dry-run --settings=config.settings_test
@@ -61,9 +67,9 @@ jobs:
       DJANGO_DEBUG: "False"
       TEST_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/talibre?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           cache: pip
@@ -100,6 +106,9 @@ jobs:
 
       - name: Verificar sintaxis del punto de entrada
         run: node --check server.js
+
+      - name: Analizar el codigo
+        run: npm run lint
 
       - name: Ejecutar tests con cobertura
         run: npm run test:cobertura
@@ -145,7 +154,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 

@@ -30,8 +30,8 @@ export const rutaNoEncontrada = (req, res) => {
   res.status(404).json({ error: true, mensaje: 'No se encontró el recurso solicitado.' });
 };
 
-// Express reconoce el manejador de errores por sus cuatro parámetros: `next` es obligatorio aunque no se use.
-export const manejarErrores = (error, req, res, next) => {
+// Express reconoce el manejador de errores por sus cuatro parámetros: `_next` es obligatorio aunque no se use.
+export const manejarErrores = (error, req, res, _next) => {
   if (error instanceof ErrorServicioExterno) registrarFallaExterna();
   if (error instanceof ErrorHttp) {
     return res.status(error.status).json({ error: true, mensaje: error.message });

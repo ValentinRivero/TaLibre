@@ -1,0 +1,12 @@
+# Analisis estatico de backend-django. Solo errores reales: nombres indefinidos, imports y variables sin uso,
+# redefiniciones y errores de sintaxis (Pyflakes y E9). El estilo no se impone por herramienta.
+target-version = "py314"
+extend-exclude = ["core/migrations"]
+
+[lint]
+select = ["F", "E9"]
+
+# Las pruebas comparten fixtures importandolos de otro modulo y pytest los inyecta por nombre como parametros. Pyflakes
+# lo lee como una redefinicion (F811) aunque es el uso previsto. Solo esa regla y solo en las pruebas.
+[lint.per-file-ignores]
+"core/tests/**" = ["F811"]
