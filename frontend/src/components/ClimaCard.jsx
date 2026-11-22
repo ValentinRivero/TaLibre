@@ -133,9 +133,11 @@ function DelDia({ datos, fecha }) {
 }
 
 // Estado de carga o de error de la franja compacta: conserva el alto de la tarjeta con datos y muestra el aviso encima.
+// La clase va después de los atributos para que ninguno la pise: sin `clima-reserva` la caja pierde su posición y el
+// aviso, que se ubica en absoluto, se extiende sobre todo el hero.
 function EstadoCompacto({ children, ...atributos }) {
   return (
-    <div className="clima-reserva" {...atributos}>
+    <div {...atributos} className="clima-reserva">
       <div aria-hidden="true"><Compacto datos={DATOS_DE_RESERVA} /></div>
       <div className="clima-reserva-estado clima-estado">{children}</div>
     </div>

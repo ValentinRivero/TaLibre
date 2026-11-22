@@ -14,8 +14,10 @@ from core.models import (
     EstadoReserva,
     EstadoTurnoFijo,
     Iluminacion,
+    LogAuditoria,
     Reserva,
     RolPermiso,
+    TipoEventoAuditoria,
     TipoOcupacion,
     TipoSuperficie,
     TurnoFijo,
@@ -311,6 +313,31 @@ class TestBajaLogicaDeCanchas:
 
     def test_superadmin_da_de_baja_cualquier_cancha(self, superadmin, cancha_ajena, cliente_de):
         assert cliente_de(superadmin).delete(f'{URL}{cancha_ajena.id}/').status_code == status.HTTP_204_NO_CONTENT
+
+    def test_la_baja_queda_auditada_con_usuario_ip_complejo_y_cancha(self, dueno, complejo, cancha, cliente_de):
+        respuesta = cliente_de(dueno).delete(f'{URL}{cancha.id}/', REMOTE_ADDR='203.0.113.7')
+
+        assert respuesta.status_code == status.HTTP_204_NO_CONTENT
+        log = LogAuditoria.objects.get(tipo_evento=TipoEventoAuditoria.CAMBIO_CONFIGURACION)
+        assert log.accion == 'Baja de cancha'
+        assert log.detalle == f'Cancha id {cancha.id} «Cancha Propia».'
+        assert (log.usuario, log.complejo, log.ip_origen) == (dueno, complejo, '203.0.113.7')
+
+    def test_la_baja_de_un_superadmin_queda_a_su_nombre_en_el_complejo_de_la_cancha(
+        self, superadmin, complejo_ajeno, cancha_ajena, cliente_de,
+    ):
+        cliente_de(superadmin).delete(f'{URL}{cancha_ajena.id}/')
+
+        log = LogAuditoria.objects.get(tipo_evento=TipoEventoAuditoria.CAMBIO_CONFIGURACION)
+        assert (log.usuario, log.complejo) == (superadmin, complejo_ajeno)
+
+    def test_una_baja_rechazada_por_ocupacion_vigente_no_se_audita(self, dueno, jugador, cancha, cliente_de):
+        self._reservar(cancha, jugador, dias=3)
+
+        respuesta = cliente_de(dueno).delete(f'{URL}{cancha.id}/')
+
+        assert respuesta.status_code == status.HTTP_400_BAD_REQUEST
+        assert not LogAuditoria.objects.filter(tipo_evento=TipoEventoAuditoria.CAMBIO_CONFIGURACION).exists()
 
 
 class TestAltasSimultaneas:
