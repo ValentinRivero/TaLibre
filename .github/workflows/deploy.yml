@@ -2,12 +2,19 @@ name: Deploy
 
 # Despliega en el servidor cuando el CI de `main` termina en verde y, a mano, con "Run workflow" (por ejemplo, si el
 # servidor estaba apagado cuando se integro un cambio). Los PR y las demas ramas nunca despliegan.
+# Rollback: "Run workflow" desde main con la etiqueta de la version anterior en `referencia` (por ejemplo v0.7.7).
+# Se lanza siempre desde main para que corra este archivo y no el de la version a la que se vuelve.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      referencia:
+        description: Etiqueta o commit a desplegar. Vacio despliega lo ultimo de main.
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -34,7 +41,18 @@ jobs:
       ENV_PRODUCCION: ${{ secrets.ENV_PRODUCCION }}
       # Se despliega el commit que aprobo el CI y no lo ultimo de main, que pudo avanzar sin pasar por las pruebas.
       COMMIT: ${{ github.event.workflow_run.head_sha }}
+      REFERENCIA_MANUAL: ${{ inputs.referencia }}
     steps:
+      # La referencia viaja como argumento de un comando remoto: solo se admiten caracteres de etiquetas y commits.
+      - name: Validar la referencia manual
+        if: github.event_name == 'workflow_dispatch' && inputs.referencia != ''
+        run: |
+          if ! printf '%s' "$REFERENCIA_MANUAL" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$'; then
+            echo "La referencia solo admite letras, numeros, punto, guion, guion bajo y barra."
+            exit 1
+          fi
+          echo "COMMIT=$REFERENCIA_MANUAL" >> "$GITHUB_ENV"
+
       - name: Verificar los secretos
         run: |
           faltantes=""
@@ -70,7 +88,7 @@ jobs:
           set -euo pipefail
           cd /opt/talibre/app
 
-          git fetch --prune origin
+          git fetch --prune --tags --force origin
           git reset --hard "$1"
 
           # Reconstruye solo las capas que cambiaron y espera a que cada contenedor quede sano.
