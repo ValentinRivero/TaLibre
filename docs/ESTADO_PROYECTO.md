@@ -122,7 +122,7 @@ Documento de seguimiento técnico del desarrollo. Cada objetivo completado y ver
 - [x] **7.5.** Política de privacidad 1.1 y Términos y condiciones de uso con limitación de responsabilidad, aceptados juntos en el registro y en el diálogo de reaceptación.
 - [x] **7.6.** Documentación interactiva OpenAPI 3 de la API de Django y de la de Node.
 - [x] **7.7.** GraphQL: consulta de detalle de complejo que combina PostgreSQL y `backend-node` (tres consultas y una mutación).
-- [ ] **7.8.** Entorno local reproducible con `docker compose` y CI con análisis estático, construcción de imágenes y prueba de humo.
+- [x] **7.8.** Entorno local reproducible con `docker compose` y CI con análisis estático, construcción de imágenes y prueba de humo.
 - [ ] **7.9.** Documentación pública de entrega: instalación, arquitectura y decisiones, guía de usuario con capturas y readme.
 
 ## Notas de la Fase 1
@@ -552,6 +552,16 @@ Documentación navegable de las dos APIs y una consulta GraphQL que combina los 
 - **Manual:** abrir `/api/docs-django/` y `/api/docs-node/`, probar una ruta pública y una privada con "Authorize", y en GraphiQL (desarrollo) o con `curl` correr `detalleComplejo` con y sin Node levantado.
 - **Resultados:** Django 2685 pasadas y 5 salteadas de concurrencia, cobertura total del 99%, Node 559 pasadas con cobertura de líneas del 99,82%. `makemigrations --check` sin cambios y la especificación de Node validada contra el esquema oficial de OpenAPI 3.0.
 
+## Notas del punto 7.8
+Todo el sistema se levanta con un solo comando desde un clon limpio, y el CI lo construye, lo levanta y lo recorre en cada pull request. Versión de la aplicación `0.7.8`. Producción no cambia: sigue con `docker-compose.yml` y sus variables fuera del repositorio.
+- **Entorno local (`docker-compose.local.yml`):** `docker compose -f docker-compose.local.yml up --build` levanta PostgreSQL 16, MongoDB 7 y Redis 7 en contenedores, los dos backends y nginx con el frontend compilado en `http://localhost:8080`. El proyecto se llama `talibre-local`, con su red y volúmenes propios, así que no choca con el stack de producción. Cada servicio tiene su healthcheck y arranca recién cuando sus dependencias están sanas. `web` aplica las migraciones y `seed_inicial` antes de levantar Daphne, con 90 segundos de gracia en frío. Todos los valores son ficticios, van en el mismo archivo y no dan acceso a nada real. Con `DJANGO_DEBUG=True` la cookie de refresh viaja sin `Secure` sobre HTTP y los correos transaccionales se ven en los registros de `web`.
+- **nginx local (`nginx/local/`):** la imagen es la misma que en producción. Por volumen se reemplaza su sitio HTTPS por uno HTTP con las mismas rutas (`/api/`, `/graphql`, `/ws/`, `/static/`, las de Node y `/api/interno` cerrada) y se vacía el filtro de rangos de Cloudflare, que rechazaría las conexiones locales.
+- **Prueba de humo (`.github/scripts/prueba_humo.py`):** solo biblioteca estándar de Python. Recorre 17 pasos a través de nginx, como un jugador desde el navegador: frontend, salud y catálogo, un turno libre en la grilla, la ficha por GraphQL con el clima, el clima de backend-node (acepta `502` si el proveedor externo no responde), las dos especificaciones OpenAPI sin rutas internas, `/api/interno` cerrada, `401` sin sesión en Django y en Node, inicio de sesión con la cookie de refresh y su renovación, WebSocket de la grilla, reserva con su evento en tiempo real, turno `OCUPADO` en la grilla, "mis reservas" y cancelación con el turno otra vez `LIBRE`. Ante la primera falla sale con código 1 y nombra el paso.
+- **CI (`.github/workflows/ci.yml`):** el job `stack` corre después de los de Django, Node y frontend. Valida el compose, construye las tres imágenes, levanta el stack con `--wait`, corre la prueba de humo con la clave de demostración tomada del propio compose, muestra los registros si algo falla y baja todo con sus volúmenes. Los jobs `django` y `node` suman el análisis estático, y todas las acciones usan versiones que corren sobre Node 24.
+- **Análisis estático:** `ruff` (reglas F y E9: nombres indefinidos, imports y variables sin uso, errores de sintaxis) en `backend-django/ruff.toml`. Se instala solo en el CI, fuera de `requirements.txt` y de la imagen. F811 se excluye solo en `core/tests`, porque los fixtures de pytest compartidos por import se inyectan como parámetros. En Node, `eslint` con la configuración recomendada y los globals de Node y Jest (`backend-node/eslint.config.js`, `npm run lint`), en las mismas versiones que el frontend. Los dos quedaron sin hallazgos después de corregir un import sin uso y renombrar el parámetro sin uso del manejador de errores de Express (conserva sus cuatro parámetros, que es como Express lo reconoce).
+- **Rollback (`deploy.yml`):** "Run workflow" admite una `referencia` opcional (etiqueta o commit), validada contra un patrón antes de viajar al servidor. Se lanza siempre desde `main`, para que corra el flujo vigente y no el de la versión a la que se vuelve. El servidor trae las etiquetas antes de posicionarse. Sin referencia despliega lo último de `main`. Volver a una versión que tenga migraciones posteriores exige revertirlas antes.
+- **Resultados:** el job `stack` en verde en el CI (imágenes, stack y 17 pasos de la prueba de humo en menos de 2 minutos). Django 2685 pasadas y 5 salteadas de concurrencia, cobertura total del 99%. Node 559 pasadas con cobertura de sentencias del 99,85%. `ruff check` y `npm run lint` de Node sin hallazgos.
+
 ## Decisiones de arquitectura
 - **Frontend:** React con Vite y PWA manual, en capas `services/`, `components/` y `pages/`: solo la capa de servicios conoce las URLs de la API, lo que separa el acceso a datos de la presentación. El access token vive en memoria y el refresh en una cookie HttpOnly, `Secure` y `SameSite=Strict`: un script inyectado por XSS no puede leer el refresh, y `SameSite=Strict` mitiga CSRF. Nada de la sesión se guarda en `localStorage`.
 - **`backend-node`:** persiste sus eventos en MongoDB Atlas con Mongoose y consulta a Django por HTTP. No accede a las 16 tablas.
@@ -560,5 +570,5 @@ Documentación navegable de las dos APIs y una consulta GraphQL que combina los 
 - **Despliegue:** VPS propio con `docker compose`, nginx y HTTPS.
 
 ### Pendientes del equipo
-- Instalar Docker Desktop.
+- Docker local es opcional: el compose local se construye, se levanta y se prueba en el job `stack` del CI.
 - Tener disponible el VPS con dominio antes del 17/11.
