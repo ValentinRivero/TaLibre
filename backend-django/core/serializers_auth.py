@@ -1,6 +1,5 @@
 import re
 
-from django.conf import settings
 from django.contrib.auth import get_user_model, password_validation
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
@@ -17,7 +16,7 @@ from .models import (
 )
 from .repositories import UsuarioRepository
 from .serializers import NombrePersonaField, TextoLimpioField, validar_telefono
-from .services import RbacService
+from .services import RbacService, UsuarioService
 
 Usuario = get_user_model()
 
@@ -163,7 +162,7 @@ class PerfilSerializer(serializers.ModelSerializer):
         return RbacService.nombre_rol_activo(usuario)
 
     def get_debe_aceptar_politica(self, usuario):
-        return usuario.version_politica_aceptada != settings.POLITICA_PRIVACIDAD_VERSION
+        return UsuarioService.debe_aceptar_politica(usuario)
 
 
 class PerfilEdicionSerializer(serializers.Serializer):

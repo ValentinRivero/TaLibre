@@ -444,6 +444,14 @@ class SesionService:
         )
 
 
+def _version_politica(version):
+    """Versión de la política como tupla de enteros ('1.10' -> (1, 10)), o None si falta o no es numérica."""
+    try:
+        return tuple(int(parte) for parte in version.split('.'))
+    except (AttributeError, ValueError):
+        return None
+
+
 class UsuarioService:
     @staticmethod
     def _constancia_de_consentimiento():
@@ -451,6 +459,21 @@ class UsuarioService:
             'version_politica_aceptada': settings.POLITICA_PRIVACIDAD_VERSION,
             'fecha_aceptacion_politica': timezone.now(),
         }
+
+    @staticmethod
+    def debe_aceptar_politica(usuario):
+        """
+        Pide la aceptación solo si la versión aceptada es anterior a la vigente, comparando número por número
+        (1.10 es posterior a 1.9). Una constancia más nueva, dejada por un despliegue posterior que comparte la base o
+        anterior a un rollback, no se vuelve a pedir ni se pisa con una versión más vieja.
+        """
+        aceptada = _version_politica(usuario.version_politica_aceptada)
+        vigente = _version_politica(settings.POLITICA_PRIVACIDAD_VERSION)
+        if aceptada is None:
+            return True
+        if vigente is None:
+            return usuario.version_politica_aceptada != settings.POLITICA_PRIVACIDAD_VERSION
+        return aceptada < vigente
 
     @staticmethod
     def registrar_jugador(datos, ip_origen):
@@ -476,14 +499,17 @@ class UsuarioService:
     @staticmethod
     def actualizar_perfil(usuario, datos, ip_origen):
         campos = {campo: datos[campo] for campo in ('nombre_completo', 'telefono') if campo in datos}
-        acepta_politica = datos.get('acepta_politica_privacidad', False)
-        if acepta_politica:
+        # Aceptar de nuevo una versión ya aceptada (o una anterior a la aceptada) no cambia la constancia ni se audita.
+        registra_aceptacion = (
+            datos.get('acepta_politica_privacidad', False) and UsuarioService.debe_aceptar_politica(usuario)
+        )
+        if registra_aceptacion:
             campos.update(UsuarioService._constancia_de_consentimiento())
         if not campos:
             return usuario
 
         UsuarioRepository.actualizar(usuario, **campos)
-        if acepta_politica:
+        if registra_aceptacion:
             AuditoriaService.registrar(
                 TipoEventoAuditoria.ACEPTACION_POLITICA, 'Aceptación de la política de privacidad',
                 detalle=f'Versión {usuario.version_politica_aceptada}.', usuario=usuario, ip_origen=ip_origen,

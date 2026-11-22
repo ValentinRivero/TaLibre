@@ -250,6 +250,49 @@ class TestAceptacionDePolitica:
         with override_settings(POLITICA_PRIVACIDAD_VERSION='2.0'):
             assert cliente.get(URL).json()['debe_aceptar_politica'] is True
 
+    @pytest.mark.parametrize('aceptada, vigente, debe_aceptar', [
+        ('1.0', '1.1', True),
+        ('1.1', '1.1', False),
+        ('1.1', '1.0', False),
+        ('1.9', '1.10', True),
+        ('1.10', '1.9', False),
+        ('', '1.1', True),
+        ('v1', '1.1', True),
+    ])
+    def test_solo_pide_aceptar_una_version_anterior_a_la_vigente(
+        self, jugador, cliente_de, aceptada, vigente, debe_aceptar,
+    ):
+        jugador.version_politica_aceptada = aceptada
+        jugador.save(update_fields=['version_politica_aceptada'])
+
+        with override_settings(POLITICA_PRIVACIDAD_VERSION=vigente):
+            assert cliente_de(jugador).get(URL).json()['debe_aceptar_politica'] is debe_aceptar
+
+    def test_un_despliegue_con_una_version_anterior_no_pisa_la_constancia_mas_nueva(self, jugador, cliente_de):
+        jugador.version_politica_aceptada = '1.1'
+        jugador.save(update_fields=['version_politica_aceptada'])
+
+        with override_settings(POLITICA_PRIVACIDAD_VERSION='1.0'):
+            respuesta = cliente_de(jugador).patch(URL, {'acepta_politica_privacidad': True}, format='json')
+
+        assert respuesta.status_code == status.HTTP_200_OK
+        jugador.refresh_from_db()
+        assert jugador.version_politica_aceptada == '1.1'
+        assert not LogAuditoria.objects.filter(tipo_evento=TipoEventoAuditoria.ACEPTACION_POLITICA).exists()
+
+    def test_aceptar_otra_vez_la_misma_version_no_duplica_la_auditoria(self, jugador, cliente_de):
+        cliente = cliente_de(jugador)
+        cliente.patch(URL, {'acepta_politica_privacidad': True}, format='json')
+        jugador.refresh_from_db()
+        primera_fecha = jugador.fecha_aceptacion_politica
+
+        respuesta = cliente.patch(URL, {'acepta_politica_privacidad': True}, format='json')
+
+        assert respuesta.status_code == status.HTTP_200_OK
+        jugador.refresh_from_db()
+        assert jugador.fecha_aceptacion_politica == primera_fecha
+        assert LogAuditoria.objects.filter(tipo_evento=TipoEventoAuditoria.ACEPTACION_POLITICA).count() == 1
+
     def test_el_admin_no_permite_editar_la_constancia(self):
         from django.contrib import admin
 
