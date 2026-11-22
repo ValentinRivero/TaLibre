@@ -592,10 +592,10 @@ Servicio de actividad y notificaciones, con su propia URL base. Su documentació
 | `GET /api/contratos/<id>/` | Superadmin | Detalle |
 | `POST /api/contratos/` | Superadmin | Alta de complejo: `propietario`, `nombre`, `direccion`, `latitud`, `longitud` y opcionales `telefono_contacto`, `horas_limite_cancelacion`, `info_sena`, `estado_contrato` (`1` o `2`) |
 | `PATCH /api/contratos/<id>/` | Superadmin | `{ "estado_contrato" }`. Con `0` o `3` el complejo deja de publicarse |
-| `GET /api/usuarios/` | Superadmin | Cuentas. Filtros `rol`, `estado`, `search` |
-| `GET /api/usuarios/<id>/` | Superadmin | Detalle |
+| `GET /api/usuarios/` | Superadmin | Cuentas. Filtros `rol`, `estado`, `search`. Cada cuenta informa `complejo_operado` y `complejo_operado_nombre` (el único complejo que opera un operador) y `complejos_propios` (`[{ "id", "nombre" }]`, los complejos no dados de baja de los que es titular, ordenados por nombre, vacía si no es dueño) |
+| `GET /api/usuarios/<id>/` | Superadmin | Detalle, con los mismos campos |
 | `PATCH /api/usuarios/<id>/` | Superadmin | `nombre_completo`, `telefono`, `rol`, `complejo_operado`, `estado` |
-| `GET /api/auditoria/` | Superadmin | Registro de eventos de seguridad, filtrable por tipo, usuario, complejo y rango de fechas. Entre los tipos: `20` solicitud de código de recuperación, `21` código bloqueado por intentos fallidos, `22` contraseña restablecida con código `23` cambio de contraseña desde la cuenta y `24` cambio de preferencias de notificaciones |
+| `GET /api/auditoria/` | Superadmin | Registro de eventos de seguridad, filtrable por tipo, usuario, complejo y rango de fechas. Entre los tipos: `20` solicitud de código de recuperación, `21` código bloqueado por intentos fallidos, `22` contraseña restablecida con código, `23` cambio de contraseña desde la cuenta y `24` cambio de preferencias de notificaciones |
 
 ### Catálogos del sistema
 
