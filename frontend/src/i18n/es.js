@@ -224,6 +224,12 @@ const es = {
           'Solo esa pestaña, hasta que la cierres',
         ],
         [
+          'Página visitada, sitio desde el que llegaste, tipo de navegador, dirección IP y tiempos de carga',
+          'Servicio de medición de Cloudflare',
+          'Medir de forma agregada las visitas y el rendimiento del sitio',
+          'El equipo, solo como totales. No se asocia a tu cuenta',
+        ],
+        [
           'Versión y fecha de aceptación de esta política',
           'Base de datos de usuarios',
           'Constancia de tu consentimiento',
@@ -257,6 +263,7 @@ const es = {
         'MongoDB Atlas: registro de actividad y notificaciones.',
         'Microsoft Azure: alojamiento de los servidores.',
         'Cloudflare: intermediario de red y protección del sitio. Procesa el tráfico entre tu navegador y nuestros servidores, incluida tu dirección IP.',
+        'Cloudflare Web Analytics: medición de visitas y rendimiento del sitio. Un script que agrega Cloudflare le envía la página visitada, el sitio desde el que llegaste, el tipo de navegador, los tiempos de carga y tu dirección IP. No usa cookies y solo vemos totales.',
         'Resend: envío de los correos de tu cuenta. Recibe tu dirección de correo y el contenido del mensaje.',
         'Redis: caché y mensajería en tiempo real, dentro de nuestros propios servidores.',
         'Esri: el mapa de calles se descarga de sus servidores, que reciben la dirección IP de quien abre el mapa. Los datos de las calles provienen de OpenStreetMap.',
@@ -296,7 +303,7 @@ const es = {
     cookies: {
       titulo: 'Cookies y almacenamiento del navegador',
       texto:
-        'Usamos una única cookie, estrictamente necesaria para mantener tu sesión. Además, el navegador guarda tu preferencia de modo claro u oscuro y, solo durante la recuperación de contraseña, la huella descripta más arriba. No usamos cookies de seguimiento, publicidad ni analítica de terceros.',
+        'Usamos una única cookie, estrictamente necesaria para mantener tu sesión. Además, el navegador guarda tu preferencia de modo claro u oscuro y, solo durante la recuperación de contraseña, la huella descripta más arriba. No usamos cookies de seguimiento, publicidad ni analítica de terceros. La medición de visitas de Cloudflare funciona sin cookies y, si tu navegador la bloquea, el sitio funciona igual.',
     },
     cambios: {
       titulo: 'Cambios en esta política',

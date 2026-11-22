@@ -35,9 +35,9 @@ const textosDeLaPolitica = () => [
   ...tLista('privacidad.derechos.items'),
 ];
 
-describe('política de privacidad 1.1', () => {
-  test('la versión publicada es la 1.1, espejo de POLITICA_PRIVACIDAD_VERSION de Django', () => {
-    expect(PARAMETROS.politica.version).toBe('1.1');
+describe('política de privacidad 1.2', () => {
+  test('la versión publicada es la 1.2, espejo de POLITICA_PRIVACIDAD_VERSION de Django', () => {
+    expect(PARAMETROS.politica.version).toBe('1.2');
     expect(PARAMETROS.politica.vigenteDesde).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
@@ -61,12 +61,24 @@ describe('política de privacidad 1.1', () => {
     expect(datos).toContain('código de recuperación');
   });
 
-  test.each(['Supabase', 'MongoDB Atlas', 'Microsoft Azure', 'Cloudflare', 'Resend', 'Esri', 'Open-Meteo'])(
+  test.each([
+    'Supabase', 'MongoDB Atlas', 'Microsoft Azure', 'Cloudflare:', 'Cloudflare Web Analytics:', 'Resend', 'Esri',
+    'Open-Meteo',
+  ])(
     'declara a %s entre los proveedores',
     (proveedor) => {
       expect(tLista('privacidad.proveedores.items').some((item) => item.startsWith(proveedor))).toBe(true);
     },
   );
+
+  test('declara la medición de visitas de Cloudflare con su finalidad y sin cookies', () => {
+    const fila = tLista('privacidad.datos.filas').find((celdas) => celdas[1].includes('Cloudflare'));
+
+    expect(fila).toBeDefined();
+    expect(fila[0]).toContain('dirección IP');
+    expect(fila[2]).toContain('agregada');
+    expect(t('privacidad.cookies.texto')).toContain('Cloudflare funciona sin cookies');
+  });
 
   test('los plazos se completan con los parámetros y no dejan marcadores sin reemplazar', () => {
     for (const plazo of tLista('privacidad.plazos.items')) {

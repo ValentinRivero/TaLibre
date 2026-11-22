@@ -113,7 +113,7 @@ export const PARAMETROS = Object.freeze({
   }),
   // Espejo de POLITICA_PRIVACIDAD_VERSION de Django.
   politica: Object.freeze({
-    version: '1.1',
+    version: '1.2',
     vigenteDesde: '2026-11-22',
     // Pantallas donde no aparece el diálogo de reaceptación: leer los términos y la política, o pedir la baja.
     rutasSinAceptacion: Object.freeze(['/terminos', '/privacidad', '/perfil']),
