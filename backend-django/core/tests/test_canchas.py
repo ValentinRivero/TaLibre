@@ -179,6 +179,38 @@ class TestAltaDeCanchas:
 
         assert respuesta.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_el_alta_queda_auditada_con_usuario_ip_complejo_y_cancha(self, dueno, complejo, cliente_de):
+        respuesta = cliente_de(dueno).post(URL, _datos_alta(complejo), format='json', REMOTE_ADDR='203.0.113.7')
+
+        assert respuesta.status_code == status.HTTP_201_CREATED
+        log = LogAuditoria.objects.get(tipo_evento=TipoEventoAuditoria.CAMBIO_CONFIGURACION)
+        assert log.accion == 'Alta de cancha'
+        assert log.detalle == f'Cancha id {respuesta.json()["id"]} «Cancha Nueva».'
+        assert (log.usuario, log.complejo, log.ip_origen) == (dueno, complejo, '203.0.113.7')
+
+    def test_el_alta_de_un_superadmin_queda_a_su_nombre_en_el_complejo_de_la_cancha(
+        self, superadmin, complejo_ajeno, cliente_de,
+    ):
+        cliente_de(superadmin).post(URL, _datos_alta(complejo_ajeno), format='json')
+
+        log = LogAuditoria.objects.get(tipo_evento=TipoEventoAuditoria.CAMBIO_CONFIGURACION)
+        assert (log.usuario, log.complejo) == (superadmin, complejo_ajeno)
+
+    @pytest.mark.parametrize('rechazo', ['nombre_repetido', 'sin_permiso_de_precios', 'complejo_ajeno'])
+    def test_un_alta_rechazada_no_se_audita(self, dueno, complejo, complejo_ajeno, cancha, cliente_de, rechazo):
+        destino, nombre = complejo, 'Cancha Nueva'
+        if rechazo == 'nombre_repetido':
+            nombre = 'Cancha Propia'
+        elif rechazo == 'sin_permiso_de_precios':
+            _quitar_permiso_de_precios()
+        else:
+            destino = complejo_ajeno
+
+        respuesta = cliente_de(dueno).post(URL, _datos_alta(destino, nombre=nombre), format='json')
+
+        assert respuesta.status_code in (status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN)
+        assert not LogAuditoria.objects.filter(tipo_evento=TipoEventoAuditoria.CAMBIO_CONFIGURACION).exists()
+
 
 class TestEdicionDeCanchas:
     def _patch(self, cliente, cancha, cuerpo):
@@ -353,6 +385,7 @@ class TestAltasSimultaneas:
         assert respuesta.status_code == status.HTTP_400_BAD_REQUEST
         assert 'nombre' in respuesta.json()['detail']
         assert Cancha.objects.filter(complejo=complejo).count() == 1
+        assert not LogAuditoria.objects.filter(tipo_evento=TipoEventoAuditoria.CAMBIO_CONFIGURACION).exists()
 
     def test_renombrado_concurrente_al_mismo_nombre(self, dueno, complejo, cancha, crear_cancha, cliente_de):
         otra = crear_cancha(complejo, 'Cancha 2')

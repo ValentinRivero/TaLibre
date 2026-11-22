@@ -699,7 +699,9 @@ class CanchaViewSet(PermisosPorCampoMixin, AccesoComplejoMixin, viewsets.ModelVi
     def guardar(self, serializer):
         self.validar_permisos_por_campo(serializer.validated_data, serializer.instance)
         if serializer.instance is None:
-            serializer.instance = CanchaService.crear(serializer.validated_data)
+            serializer.instance = CanchaService.crear(
+                serializer.validated_data, self.request.user, AuditoriaService.ip_de_request(self.request),
+            )
         else:
             serializer.instance = CanchaService.actualizar(
                 serializer.instance, serializer.validated_data, _confirmado(self.request),
