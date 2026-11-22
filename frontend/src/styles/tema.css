@@ -953,12 +953,21 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.5rem;
-  padding-top: 20vh;
   background: var(--tema-velo);
   backdrop-filter: blur(2px);
   opacity: 0;
   animation: cargando-aparecer 0.2s ease 150ms forwards;
+}
+
+/* El velo cubre la pantalla anterior entera, y la animación queda a la vista aunque la página esté desplazada */
+.cargando-superpuesto-centro {
+  position: sticky;
+  top: 30vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 20vh;
 }
 
 @keyframes cargando-aparecer {
