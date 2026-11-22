@@ -1,6 +1,8 @@
 from unittest import mock
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
@@ -8,6 +10,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from core.models import (
     EstadoContrato,
+    EstadoRegistro,
     EstadoUsuario,
     LogAuditoria,
     Rol,
@@ -22,7 +25,8 @@ from conftest import PASSWORD_PRUEBA
 URL = '/api/usuarios/'
 
 CAMPOS_EXPUESTOS = {
-    'id', 'email', 'nombre_completo', 'telefono', 'rol', 'complejo_operado', 'complejo_operado_nombre', 'estado',
+    'id', 'email', 'nombre_completo', 'telefono', 'rol', 'complejo_operado', 'complejo_operado_nombre',
+    'complejos_propios', 'estado',
     'estado_nombre', 'version_politica_aceptada', 'fecha_aceptacion_politica', 'fecha_creacion',
     'fecha_modificacion',
 }
@@ -64,6 +68,65 @@ class TestConsultaDeUsuarios:
 
     def test_detalle_inexistente_responde_404(self, superadmin, cliente_de):
         assert cliente_de(superadmin).get(f'{URL}999999/').status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestComplejosDeCadaCuenta:
+    def test_el_dueno_informa_todos_sus_complejos_vigentes_por_nombre(self, superadmin, dueno, crear_complejo,
+                                                                      cliente_de):
+        segundo = crear_complejo(dueno, 'Beta Pádel', estado_contrato=EstadoContrato.SUSPENDIDO)
+        primero = crear_complejo(dueno, 'Alfa Fútbol')
+        crear_complejo(dueno, 'Cerrado', estado=EstadoRegistro.BAJA)
+
+        datos = cliente_de(superadmin).get(f'{URL}{dueno.id}/').json()
+
+        assert datos['complejos_propios'] == [
+            {'id': primero.id, 'nombre': 'Alfa Fútbol'},
+            {'id': segundo.id, 'nombre': 'Beta Pádel'},
+        ]
+        assert datos['complejo_operado'] is None
+
+    def test_el_listado_informa_los_complejos_de_cada_dueno(self, superadmin, dueno, otro_dueno, complejo,
+                                                           complejo_ajeno, cliente_de):
+        resultados = {fila['id']: fila for fila in cliente_de(superadmin).get(URL).json()['results']}
+
+        assert resultados[dueno.id]['complejos_propios'] == [{'id': complejo.id, 'nombre': 'Complejo Propio'}]
+        assert resultados[otro_dueno.id]['complejos_propios'] == [{'id': complejo_ajeno.id, 'nombre': 'Complejo Ajeno'}]
+        assert resultados[superadmin.id]['complejos_propios'] == []
+
+    def test_operador_y_jugador_no_tienen_complejos_propios(self, superadmin, operador, jugador, complejo,
+                                                           cliente_de):
+        cliente = cliente_de(superadmin)
+
+        datos_operador = cliente.get(f'{URL}{operador.id}/').json()
+        assert datos_operador['complejos_propios'] == []
+        assert datos_operador['complejo_operado_nombre'] == 'Complejo Propio'
+        assert cliente.get(f'{URL}{jugador.id}/').json()['complejos_propios'] == []
+
+    def test_la_cantidad_de_consultas_no_crece_con_los_duenos(self, superadmin, crear_usuario, crear_complejo,
+                                                             cliente_de):
+        cliente = cliente_de(superadmin)
+
+        def consultas_del_listado():
+            with CaptureQueriesContext(connection) as capturadas:
+                assert cliente.get(URL).status_code == status.HTTP_200_OK
+            return len(capturadas)
+
+        dueno = crear_usuario('titular.uno@talibre.test', 'DUENO_COMPLEJO')
+        crear_complejo(dueno, 'Primero')
+        con_un_dueno = consultas_del_listado()
+
+        for numero in range(2, 6):
+            titular = crear_usuario(f'titular.{numero}@talibre.test', 'DUENO_COMPLEJO')
+            crear_complejo(titular, f'Complejo {numero}')
+            crear_complejo(titular, f'Anexo {numero}')
+
+        assert consultas_del_listado() == con_un_dueno
+
+    def test_la_respuesta_de_una_edicion_incluye_los_complejos(self, superadmin, dueno, complejo, cliente_de):
+        respuesta = _patch(cliente_de(superadmin), dueno, {'nombre_completo': 'Dueño Renombrado'})
+
+        assert respuesta.status_code == status.HTTP_200_OK
+        assert respuesta.json()['complejos_propios'] == [{'id': complejo.id, 'nombre': 'Complejo Propio'}]
 
     def test_filtra_por_rol_estado_y_busqueda(self, superadmin, jugador, dueno, crear_usuario, cliente_de):
         suspendido = crear_usuario('suspendido@talibre.test', estado=EstadoUsuario.SUSPENDIDO)

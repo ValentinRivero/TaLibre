@@ -120,7 +120,11 @@ class UsuarioRepository:
 
     @staticmethod
     def listar():
-        return Usuario.objects.select_related('rol', 'complejo_operado').order_by('id')
+        return (
+            Usuario.objects.select_related('rol', 'complejo_operado')
+            .prefetch_related(ComplejoRepository.prefetch_propios_vigentes())
+            .order_by('id')
+        )
 
     @staticmethod
     def ids_activos_con_rol(nombre_rol):
@@ -324,6 +328,21 @@ class ComplejoRepository:
     @staticmethod
     def vigentes():
         return ComplejoRepository._vigentes().order_by('nombre', 'id')
+
+    @staticmethod
+    def _propios_vigentes():
+        return ComplejoRepository.vigentes().only('id', 'nombre', 'propietario_id')
+
+    @staticmethod
+    def prefetch_propios_vigentes():
+        # Una sola consulta para todos los titulares de la página, sin importar cuántos complejos tenga cada uno.
+        return Prefetch(
+            'complejos_propios', queryset=ComplejoRepository._propios_vigentes(), to_attr='complejos_propios_vigentes',
+        )
+
+    @staticmethod
+    def propios_vigentes(usuario_id):
+        return list(ComplejoRepository._propios_vigentes().filter(propietario_id=usuario_id))
 
     @staticmethod
     def contratos():
