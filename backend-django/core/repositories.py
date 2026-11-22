@@ -40,6 +40,7 @@ from .models import (
     HorarioApertura,
     LogAuditoria,
     Permiso,
+    PreferenciaNotificacionRol,
     Reserva,
     Rol,
     RolPermiso,
@@ -140,6 +141,11 @@ class UsuarioRepository:
     @staticmethod
     def cantidad_activos():
         return Usuario.objects.filter(estado=EstadoUsuario.ACTIVO).count()
+
+    @staticmethod
+    def nombres_de_rol(usuario_ids):
+        """{usuario_id: nombre del rol} de todos los ids en una sola consulta; un id inexistente no aparece."""
+        return dict(Usuario.objects.filter(id__in=list(usuario_ids)).values_list('id', 'rol__nombre'))
 
     @staticmethod
     def ids_activos_entre(usuario_ids):
@@ -1167,6 +1173,36 @@ class RecuperacionContrasenaRepository:
         return CodigoRecuperacionContrasena.objects.filter(
             fecha_creacion__lt=limite, ip_solicitud__isnull=False,
         ).update(ip_solicitud=None, fecha_modificacion=timezone.now())
+
+
+class PreferenciaNotificacionRepository:
+    @staticmethod
+    def guardadas():
+        """Lo que el superadministrador cambió y sigue vigente: {(rol_base, tipo_notificacion): habilitada}."""
+        filas = PreferenciaNotificacionRol.objects.filter(estado=EstadoRegistro.ACTIVO).values_list(
+            'rol_base', 'tipo_notificacion', 'habilitada',
+        )
+        return {(rol_base, tipo): habilitada for rol_base, tipo, habilitada in filas}
+
+    @staticmethod
+    def todas_bloqueadas():
+        """Todas las filas, también las dadas de baja, con bloqueo: {(rol_base, tipo_notificacion): fila}."""
+        filas = PreferenciaNotificacionRol.objects.select_for_update().all()
+        return {(fila.rol_base, fila.tipo_notificacion): fila for fila in filas}
+
+    @staticmethod
+    def crear(rol_base, tipo_notificacion, habilitada):
+        return PreferenciaNotificacionRol.objects.create(
+            rol_base=rol_base, tipo_notificacion=tipo_notificacion, habilitada=habilitada,
+        )
+
+    @staticmethod
+    def actualizar(fila, habilitada):
+        """Deja la fila vigente con el valor indicado: reactiva una baja lógica en lugar de duplicarla."""
+        fila.habilitada = habilitada
+        fila.estado = EstadoRegistro.ACTIVO
+        fila.save(update_fields=['habilitada', 'estado', 'fecha_modificacion'])
+        return fila
 
 
 class AuditoriaRepository:

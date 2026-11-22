@@ -1648,6 +1648,16 @@ a {
     justify-content: flex-end;
     padding-top: 0.6rem;
   }
+
+  /* Celda de título de la fila (nombre y descripción): ocupa todo el ancho y se lee de izquierda a derecha */
+  .tabla-apilable td.celda-titulo {
+    display: block;
+    text-align: left;
+  }
+
+  .tabla-apilable td.celda-titulo::before {
+    content: none;
+  }
 }
 
 /* Editor de horarios: un bloque por día, en columnas cuando hay lugar */

@@ -27,6 +27,7 @@ CAMPOS_PERMISO = {'id', 'codigo', 'nombre', 'modulo', 'asignable'}
 PERMISOS_DE_PLATAFORMA = [
     'ver_panel_sistema', 'ver_contratos', 'administrar_contratos', 'ver_usuarios', 'editar_usuarios',
     'desactivar_usuarios', 'administrar_catalogos', 'administrar_roles', 'auditar_seguridad',
+    'administrar_notificaciones',
 ]
 
 

@@ -49,6 +49,7 @@ from .serializers import (
     MarcadorComplejoSerializer,
     OperadorSerializer,
     PermisoAdminSerializer,
+    PreferenciasNotificacionSerializer,
     ReaperturaSerializer,
     RechazoTransferenciaSerializer,
     ReservaAgendaEdicionSerializer,
@@ -94,6 +95,7 @@ from .services import (
     GrillaService,
     HorarioAperturaService,
     OperadorService,
+    PreferenciaNotificacionService,
     RbacService,
     RecordatorioService,
     RecuperacionContrasenaService,
@@ -521,6 +523,24 @@ class PermisoAdminViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
     def get_queryset(self):
         return RolAdminService.permisos()
+
+
+class PreferenciasNotificacionView(APIView):
+    """Matriz de notificaciones por rol base: solo el superadministrador la consulta y la modifica."""
+
+    permission_classes = [TienePermisoRBAC]
+    permisos_requeridos = {'GET': ('administrar_notificaciones',), 'PUT': ('administrar_notificaciones',)}
+
+    def get(self, request):
+        return Response(PreferenciaNotificacionService.matriz())
+
+    def put(self, request):
+        entrada = PreferenciasNotificacionSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        matriz = PreferenciaNotificacionService.actualizar(
+            entrada.validated_data['preferencias'], request.user, AuditoriaService.ip_de_request(request),
+        )
+        return Response(matriz)
 
 
 BACKENDS_DE_LISTADO = (DjangoFilterBackend, BusquedaFlexibleFilter, OrderingFilter)

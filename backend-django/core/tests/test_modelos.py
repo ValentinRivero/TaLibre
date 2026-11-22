@@ -36,15 +36,16 @@ TABLAS_ESPERADAS = {
     'reservas',
     'logs_auditoria',
     'codigos_recuperacion_contrasena',
+    'preferencias_notificaciones_rol',
 }
 
 
 class EsquemaTests(TestCase):
-    def test_existen_las_15_tablas(self):
+    def test_existen_las_16_tablas(self):
         tablas_bd = set(connection.introspection.table_names())
         self.assertTrue(TABLAS_ESPERADAS.issubset(tablas_bd), TABLAS_ESPERADAS - tablas_bd)
 
-    def test_core_define_exactamente_15_modelos(self):
+    def test_core_define_exactamente_16_modelos(self):
         tablas_core = {modelo._meta.db_table for modelo in apps.get_app_config('core').get_models()}
         self.assertEqual(tablas_core, TABLAS_ESPERADAS)
 
