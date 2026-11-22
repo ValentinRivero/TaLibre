@@ -533,6 +533,13 @@ Términos de uso y política de privacidad para el sitio publicado, que muestra 
 - **Redacción:** ningún texto de la interfaz usa punto y coma. Las pruebas de la política y de los términos lo verifican.
 - **Pruebas:** Django 2655 pasadas y 5 salteadas de concurrencia (`pytest -m "not concurrency" --cov=core`, cobertura total del 99%), Vitest 1176 en 54 archivos, `npm run lint`, `npm run build` y `makemigrations --check` sin observaciones. Casos nuevos en `test_canchas.py` (alta auditada, alta de superadmin y altas rechazadas sin registro), `privacidad.test.js` y `TerminosCondiciones.test.js` (secciones en orden, normas citadas, enlaces, mailto con asunto, rutas libres del diálogo, pie y tarjeta del alias).
 
+## Notas de la política de privacidad 1.2
+Ajuste del punto 7.5, sin ítem nuevo del plan: `PARAMETROS.app.version` no cambia.
+- **Motivo:** el sitio publicado pasa por el proxy de Cloudflare, que inyecta en el HTML el script de Cloudflare Web Analytics (medición de visitas y rendimiento). No forma parte del código ni de nginx, pero envía datos de navegación de quien visita el sitio a un tercero, así que se declara con su finalidad.
+- **Cambios:** fila nueva en la tabla de datos (página visitada, sitio de origen, navegador, dirección IP y tiempos de carga, para medir visitas y rendimiento de forma agregada, sin asociarlo a la cuenta), Cloudflare Web Analytics como proveedor propio y una aclaración en la sección de cookies: funciona sin cookies y, si el navegador lo bloquea, el sitio funciona igual.
+- **Versión:** `POLITICA_PRIVACIDAD_VERSION` y su espejo `PARAMETROS.politica.version` pasan a `1.2`, la misma de los Términos y condiciones. Al ingresar, cada usuario acepta una vez la nueva versión.
+- **Pruebas:** `privacidad.test.js` verifica la versión, el proveedor nuevo y su fila con la finalidad y la aclaración de cookies. Vitest 1193 en 55 archivos y `npm run lint` sin errores. En Django, `test_perfil.py`, `test_registro.py` y `test_parametros.py` (344 pasadas), que leen la versión de la configuración.
+
 ## Notas de los puntos 7.6 y 7.7
 Documentación navegable de las dos APIs y una consulta GraphQL que combina los dos backends. Versión de la aplicación `0.7.7`. Rama `feat/openapi-y-graphql`, que además trae el velo de la carga entre pantallas y el arreglo de la aceptación de la política (ver sus notas).
 
