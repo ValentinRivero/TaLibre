@@ -68,8 +68,16 @@ class TestDocumentacionInteractiva:
 
         assert script.status_code == status.HTTP_200_OK
         assert 'SwaggerUIBundle' in script.content.decode()
+        assert '<script src="' in html and '<script>' not in html
         assert 'cdn.jsdelivr.net' not in html
         assert 'drf_spectacular_sidecar' in html
+
+    def test_usa_el_mismo_diseno_que_node_con_modo_oscuro_y_sin_validador_externo(self, cliente):
+        script = cliente.get(f'{URL_DOCUMENTACION}?script=').content.decode()
+
+        assert 'layout: "StandaloneLayout"' in script
+        assert 'SwaggerUIStandalonePreset' in script
+        assert 'validatorUrl: null' in script
 
     @override_settings(API_DOCS_HABILITADA=False)
     @pytest.mark.parametrize('url', [URL_ESQUEMA, URL_DOCUMENTACION])

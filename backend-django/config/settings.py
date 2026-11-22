@@ -258,6 +258,12 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': r'/api/',
     'PREPROCESSING_HOOKS': ['core.openapi.excluir_rutas_no_publicas'],
+    # Mismo diseño que la documentación de backend-node: barra superior con el selector de modo claro y oscuro. Va como
+    # texto porque los presets son objetos de JavaScript. Sin validador externo: no se envía la URL a terceros.
+    'SWAGGER_UI_SETTINGS': (
+        '{ deepLinking: true, validatorUrl: null, layout: "StandaloneLayout",'
+        ' presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset] }'
+    ),
     'SWAGGER_UI_DIST': 'SIDECAR',
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
     'REDOC_DIST': 'SIDECAR',
