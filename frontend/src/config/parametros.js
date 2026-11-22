@@ -29,9 +29,9 @@ export const ENTORNO = Object.freeze({
 
 export const PARAMETROS = Object.freeze({
   idioma: 'es',
-  // Versión de la aplicación que muestra el pie de página: `0.<fase>.<ítem>` del plan (6.4 -> 0.6.4) hasta el despliegue,
-  // cuando pasa a 1.0.0 (CLAUDE.md §8.8).
-  app: Object.freeze({ version: '0.7.8' }),
+  // Versión de la aplicación que muestra el pie de página: `0.<fase>.<ítem>` del plan (6.4 -> 0.6.4). La entrega
+  // queda en la 0.7.9 (CLAUDE.md §8.8).
+  app: Object.freeze({ version: '0.7.9' }),
   formato: Object.freeze({ locale: 'es-AR', moneda: 'ARS' }),
   // Espejo de PAGE_SIZE de Django y del límite por defecto de Node.
   paginacion: Object.freeze({ tamanio: 20, botones: 5 }),
