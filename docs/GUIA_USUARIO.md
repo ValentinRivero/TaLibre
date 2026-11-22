@@ -203,7 +203,11 @@ Lo mismo ocurre cuando el complejo carga una reserva manual, cierra una franja o
 
 ## 8. Celular, aplicación instalable y modo oscuro
 
-![Grilla en un celular en modo oscuro con un turno seleccionado](capturas/14-movil-android-grilla-oscuro.png)
+| Android | iPhone |
+|---|---|
+| ![Grilla en un celular Android en modo oscuro con un turno seleccionado](capturas/14-movil-android-grilla-oscuro.png) | ![Grilla en un iPhone en modo oscuro con el aviso para instalar la aplicación](capturas/15-movil-iphone-grilla-oscuro.png) |
+
+Las dos capturas muestran la grilla de un día en modo oscuro con un turno seleccionado y su resumen. En la del iPhone aparece abajo el aviso para instalar la aplicación.
 
 - **Celular:** las vistas públicas y del jugador están pensadas primero para el celular, con botones y casilleros de al menos 44 píxeles. En pantallas chicas el menú se abre con el botón de la derecha.
 - **Aplicación instalable:** en el celular, el navegador ofrece instalar TaLibre en la pantalla de inicio. En iPhone, un aviso explica cómo hacerlo desde **Compartir > Agregar a pantalla de inicio**. Instalada, abre a pantalla completa y carga más rápido.
