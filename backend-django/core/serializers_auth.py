@@ -158,10 +158,10 @@ class PerfilSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
-    def get_rol(self, usuario):
+    def get_rol(self, usuario) -> str | None:
         return RbacService.nombre_rol_activo(usuario)
 
-    def get_debe_aceptar_politica(self, usuario):
+    def get_debe_aceptar_politica(self, usuario) -> bool:
         return UsuarioService.debe_aceptar_politica(usuario)
 
 
