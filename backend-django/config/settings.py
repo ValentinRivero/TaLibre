@@ -239,7 +239,7 @@ SIMPLE_JWT = {
 }
 
 # Versión vigente de la política de privacidad publicada en el frontend; cambiarla obliga a aceptarla de nuevo.
-POLITICA_PRIVACIDAD_VERSION = '1.0'
+POLITICA_PRIVACIDAD_VERSION = '1.1'
 
 CORS_ALLOWED_ORIGINS = _env_lista(
     'CORS_ALLOWED_ORIGINS',

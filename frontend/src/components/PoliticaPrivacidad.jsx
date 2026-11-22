@@ -9,7 +9,12 @@ const { contacto, version, vigenteDesde, retencionIpMeses, retencionContactoDias
 
 /** Política de privacidad pública, con el contenido que exige la Ley 25.326. La versión sale de `parametros.js`. */
 export default function PoliticaPrivacidad() {
-  const parametros = { contacto, meses: retencionIpMeses, dias: retencionContactoDias };
+  const parametros = {
+    contacto,
+    meses: retencionIpMeses,
+    dias: retencionContactoDias,
+    minutos: PARAMETROS.recuperacion.vigenciaMinutos,
+  };
 
   return (
     <article className="mx-auto" style={{ maxWidth: '52rem' }}>
@@ -41,6 +46,14 @@ export default function PoliticaPrivacidad() {
         <ListaTextos clave="privacidad.proveedores.items" />
       </SeccionPolitica>
 
+      <SeccionPolitica titulo={t('privacidad.correos.titulo')}>
+        <p>{t('privacidad.correos.texto')}</p>
+      </SeccionPolitica>
+
+      <SeccionPolitica titulo={t('privacidad.seguridad.titulo')}>
+        <p>{t('privacidad.seguridad.texto')}</p>
+      </SeccionPolitica>
+
       <SeccionPolitica titulo={t('privacidad.plazos.titulo')}>
         <ListaTextos clave="privacidad.plazos.items" params={parametros} />
       </SeccionPolitica>
@@ -52,6 +65,10 @@ export default function PoliticaPrivacidad() {
 
       <SeccionPolitica titulo={t('privacidad.cookies.titulo')}>
         <p>{t('privacidad.cookies.texto')}</p>
+      </SeccionPolitica>
+
+      <SeccionPolitica titulo={t('privacidad.cambios.titulo')}>
+        <p>{t('privacidad.cambios.texto')}</p>
       </SeccionPolitica>
 
       <SeccionPolitica titulo={t('privacidad.aaip.titulo')}>

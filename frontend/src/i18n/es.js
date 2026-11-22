@@ -156,7 +156,7 @@ const es = {
         [
           'Nombre, email y teléfono de tu cuenta',
           'Base de datos de usuarios',
-          'Identificar tu cuenta, iniciar sesión y contactarte por una reserva',
+          'Identificar tu cuenta, iniciar sesión, enviarte los correos de seguridad de tu cuenta y contactarte por una reserva',
           'Vos, el complejo donde reservás y el superadministrador de la plataforma',
         ],
         [
@@ -169,7 +169,7 @@ const es = {
           'Nombre y email del propietario de un complejo',
           'Base de datos de usuarios',
           'Identificar al titular del contrato del complejo',
-          'Solo el superadministrador; el catálogo público no lo muestra',
+          'Solo el superadministrador. El catálogo público no lo muestra',
         ],
         [
           'Nombre y teléfono de clientes cargados a mano',
@@ -184,10 +184,40 @@ const es = {
           'Quien administra ese complejo, hasta que la reserva se resuelve',
         ],
         [
+          'Alias, CBU o CVU y titular de la cuenta del complejo para recibir señas',
+          'Datos del complejo',
+          'Que transfieras la seña a la cuenta correcta',
+          'Quien reserva, solo mientras su seña está pendiente, y el personal del complejo. El catálogo público no los muestra',
+        ],
+        [
+          'Nombre de quien transfirió la seña y número de operación',
+          'Reservas',
+          'Que el complejo identifique tu transferencia antes de confirmar la seña. No pedimos DNI, CUIT ni datos bancarios',
+          'Vos y el personal del complejo donde reservaste',
+        ],
+        [
+          'Motivo y nota del rechazo de una transferencia',
+          'Reservas',
+          'Explicarte por qué tenés que informar de nuevo la transferencia',
+          'Vos y el personal de ese complejo',
+        ],
+        [
           'Dirección IP, identificador de usuario y tipo de evento',
           'Registro de auditoría y archivo de seguridad',
           'Seguridad: detectar accesos indebidos y fuerza bruta',
           'Solo el superadministrador',
+        ],
+        [
+          'Dirección IP desde la que pediste un código de recuperación y huella criptográfica del código',
+          'Registro de códigos de recuperación',
+          'Detectar abusos del restablecimiento de contraseña y verificar el código sin guardarlo',
+          'Nadie desde la aplicación',
+        ],
+        [
+          'Huella no reversible de tu correo y momento en que podés pedir otro código',
+          'Almacenamiento de la pestaña del navegador',
+          'Que la pantalla de recuperación recuerde que ya pediste un código',
+          'Solo esa pestaña, hasta que la cierres',
         ],
         [
           'Versión y fecha de aceptación de esta política',
@@ -212,7 +242,7 @@ const es = {
     destinatarios: {
       titulo: 'Destinatarios',
       texto:
-        'Cuando reservás, el complejo donde reservás recibe tu nombre y tu teléfono para gestionar el turno. No cedemos tus datos a otros terceros con fines comerciales.',
+        'Cuando reservás, el complejo donde reservás recibe tu nombre y tu teléfono para gestionar el turno y, si informás una transferencia, el nombre de quien transfirió y el número de operación. No cedemos tus datos a otros terceros con fines comerciales.',
     },
     proveedores: {
       titulo: 'Proveedores que alojan o procesan datos',
@@ -222,7 +252,9 @@ const es = {
         'Supabase: base de datos principal (PostgreSQL).',
         'MongoDB Atlas: registro de actividad y notificaciones.',
         'Microsoft Azure: alojamiento de los servidores.',
-        'Redis, si está habilitado: caché y mensajería en tiempo real.',
+        'Cloudflare: intermediario de red y protección del sitio. Procesa el tráfico entre tu navegador y nuestros servidores, incluida tu dirección IP.',
+        'Resend: envío de los correos de tu cuenta. Recibe tu dirección de correo y el contenido del mensaje.',
+        'Redis, si está habilitado: caché y mensajería en tiempo real, dentro de nuestros propios servidores.',
         'Esri: el mapa de calles se descarga de sus servidores, que reciben la dirección IP de quien abre el mapa. Los datos de las calles provienen de OpenStreetMap.',
         'Open-Meteo: pronóstico del clima. Recibe solo las coordenadas del complejo, nunca datos tuyos.',
       ],
@@ -233,8 +265,20 @@ const es = {
         'Tu cuenta se conserva mientras esté activa. Si pedís la baja, tu nombre, email, teléfono y contraseña se anonimizan.',
         'La dirección IP de los registros de seguridad se anonimiza pasados %meses% meses.',
         'El nombre y el teléfono conservados por una reserva señada se borran cuando la reserva se resuelve o, como máximo, %dias% días después del turno.',
+        'Los códigos de recuperación de contraseña vencen a los %minutos% minutos y no se pueden volver a usar. La dirección IP del pedido se anonimiza a los %meses% meses.',
+        'La huella que guarda la pantalla de recuperación desaparece al cerrar la pestaña.',
         'Las sesiones vencidas se eliminan a diario.',
       ],
+    },
+    correos: {
+      titulo: 'Correos que te enviamos',
+      texto:
+        'Solo te escribimos por cuestiones de seguridad de tu cuenta, como el código para restablecer tu contraseña. No enviamos publicidad ni usamos tu correo para otros fines.',
+    },
+    seguridad: {
+      titulo: 'Seguridad de los datos',
+      texto:
+        'Aplicamos medidas técnicas y organizativas para proteger tus datos (art. 9 de la Ley 25.326): contraseñas guardadas con hash, conexión cifrada por HTTPS, sesión en una cookie inaccesible para los scripts de la página, permisos por rol, límites de intentos y un registro de auditoría que nunca guarda contraseñas, códigos ni correos tipeados.',
     },
     derechos: {
       titulo: 'Tus derechos',
@@ -247,9 +291,14 @@ const es = {
       ],
     },
     cookies: {
-      titulo: 'Cookies',
+      titulo: 'Cookies y almacenamiento del navegador',
       texto:
-        'Usamos una única cookie, estrictamente necesaria para mantener tu sesión. No usamos cookies de seguimiento ni de terceros.',
+        'Usamos una única cookie, estrictamente necesaria para mantener tu sesión. Además, el navegador guarda tu preferencia de modo claro u oscuro y, solo durante la recuperación de contraseña, la huella descripta más arriba. No usamos cookies de seguimiento, publicidad ni analítica de terceros.',
+    },
+    cambios: {
+      titulo: 'Cambios en esta política',
+      texto:
+        'Si modificamos esta política publicamos la nueva versión con su fecha de vigencia. Cuando el cambio es sustancial te pedimos que la aceptes de nuevo al ingresar, y si no estás de acuerdo podés solicitar la baja de tu cuenta.',
     },
     aaip: {
       titulo: 'Autoridad de control',
@@ -431,7 +480,7 @@ const es = {
     confirmar: 'Confirmar reserva',
     creadaTitulo: 'Reserva registrada',
     creadaSinSena: 'Tu turno quedó registrado. El complejo lo confirmará y te avisará.',
-    creadaSena: 'Transferí la seña al alias del complejo para asegurar tu turno. Después avisale desde "Mis reservas" con el número de operación; el complejo la confirma al verla en su cuenta.',
+    creadaSena: 'Transferí la seña al alias del complejo para asegurar tu turno. Después avisale desde "Mis reservas" con el número de operación. El complejo la confirma al verla en su cuenta.',
     desgloseTitulo: 'Montos del turno',
     desgloseSenaAviso: 'Para asegurar el turno transferís la seña ahora - el saldo se abona en el complejo.',
     verMisReservas: 'Ver mis reservas',
@@ -1164,7 +1213,7 @@ const es = {
     sinDuenos: 'No hay dueños activos que coincidan con la búsqueda.',
     errorPropietario: 'Elegí el propietario del complejo.',
     estadoInicial: 'Estado inicial del contrato',
-    ayudaEstadoInicial: 'Pendiente no publica el complejo; activo lo publica en el catálogo.',
+    ayudaEstadoInicial: 'Pendiente no publica el complejo. Activo lo publica en el catálogo.',
     crear: 'Crear complejo',
     creando: 'Creando',
     avisoAlta: 'El complejo y su contrato quedaron registrados.',
@@ -1332,7 +1381,7 @@ const es = {
   },
   roles: {
     titulo: 'Roles',
-    descripcion: 'Roles del sistema y sus permisos. Los roles base están protegidos; los personalizados se crean con permisos operativos.',
+    descripcion: 'Roles del sistema y sus permisos. Los roles base están protegidos y los personalizados se crean con permisos operativos.',
     nuevo: 'Nuevo rol',
     buscar: 'Buscar por nombre o descripción',
     columnas: {

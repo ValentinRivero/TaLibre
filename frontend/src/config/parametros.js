@@ -113,8 +113,8 @@ export const PARAMETROS = Object.freeze({
   }),
   // Espejo de POLITICA_PRIVACIDAD_VERSION de Django.
   politica: Object.freeze({
-    version: '1.0',
-    vigenteDesde: '2026-11-12',
+    version: '1.1',
+    vigenteDesde: '2026-11-22',
     contacto: 'contactotalibre@irracional.net',
     // Espejos de AUDITORIA_RETENCION_MESES y CONTACTOS_BAJA_DIAS de Django.
     retencionIpMeses: 12,
