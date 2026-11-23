@@ -78,7 +78,7 @@ export const PARAMETROS = Object.freeze({
   // tienen una `url` https.
   pie: Object.freeze({
     redes: Object.freeze([
-      Object.freeze({ clave: 'instagram', icono: 'instagram', usuario: '@talibre.goya', url: 'https://www.instagram.com/' }),
+      Object.freeze({ clave: 'instagram', icono: 'instagram', usuario: '@ta.libre', url: 'https://www.instagram.com/ta.libre' }),
       Object.freeze({ clave: 'facebook', icono: 'facebook', usuario: '@talibre.goya', url: 'https://www.facebook.com/' }),
       Object.freeze({ clave: 'twitter', icono: 'twitter', usuario: '@talibre_goya', url: 'https://x.com/' }),
     ]),
