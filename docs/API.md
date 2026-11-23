@@ -6,9 +6,9 @@ Referencia de los endpoints vigentes del backend principal. Todas las rutas cuel
 
 **Autenticación.** Las rutas privadas esperan `Authorization: Bearer <access>`. El access dura poco y se renueva con `POST /api/token/refresh/`: el refresh viaja en una cookie `HttpOnly` que gestiona el navegador y que JavaScript no puede leer. Las rutas públicas ignoran el encabezado `Authorization`.
 
-**Acceso.** Cada ruta indica el rol mínimo. El superadmin puede operar sobre cualquier complejo; dueño y operador, solo sobre el suyo. Un recurso de otro complejo responde `404`, igual que uno inexistente.
+**Acceso.** Cada ruta indica el rol mínimo. El superadmin puede operar sobre cualquier complejo. Dueño y operador, solo sobre el suyo. Un recurso de otro complejo responde `404`, igual que uno inexistente.
 
-**Errores.** Siempre con la misma forma; `detail` es un texto o un objeto con un mensaje por campo:
+**Errores.** Siempre con la misma forma. `detail` es un texto o un objeto con un mensaje por campo:
 
 ```json
 { "error": true, "detail": "No se encontró el recurso solicitado." }
@@ -22,9 +22,9 @@ Referencia de los endpoints vigentes del backend principal. Todas las rutas cuel
 | 404 | No existe o no es accesible para el usuario |
 | 405 | Método no admitido en la ruta |
 | 409 | El turno choca con una reserva, un turno fijo o una excepción horaria |
-| 429 | Demasiadas solicitudes; reintentar más tarde |
+| 429 | Demasiadas solicitudes, reintentar más tarde |
 
-**Listados.** Paginados de a 20: `{ "count", "next", "previous", "results" }`, con `?page=`. Los filtros aceptan solo los parámetros documentados; un valor inválido responde `400` y un parámetro desconocido se ignora. `?search=` no distingue mayúsculas ni tildes, y varios términos separados por espacios se exigen todos.
+**Listados.** Paginados de a 20: `{ "count", "next", "previous", "results" }`, con `?page=`. Los filtros aceptan solo los parámetros documentados. Un valor inválido responde `400` y un parámetro desconocido se ignora. `?search=` no distingue mayúsculas ni tildes, y varios términos separados por espacios se exigen todos.
 
 **Bajas.** Ningún `DELETE` borra datos: aplica una baja lógica.
 
@@ -52,18 +52,18 @@ Las acciones que escriben (altas, bajas, reservas) se ejecutan de verdad sobre l
 |---|---|---|
 | `GET /api/health/` | Público | Estado del servicio |
 | `POST /api/registro/` | Público | Alta de jugador: `nombre_completo` (2 a 120 caracteres: letras, espacios, apóstrofes, guiones y puntos), `email` (6 a 120 caracteres, con formato válido), `password` (8 a 128 caracteres: letras sin tildes ni ñ, números y los símbolos `!@#$%^&*()_+-=.,:;?/`, sin espacios), `telefono` (opcional: números, espacios, guiones, paréntesis y un `+` inicial) y `acepta_politica_privacidad: true`. Un valor fuera de estas reglas responde `400` con el detalle por campo |
-| `POST /api/token/` | Público | Inicio de sesión con `email` y `password`; devuelve `{ access }` y la cookie de sesión |
+| `POST /api/token/` | Público | Inicio de sesión con `email` y `password`. Devuelve `{ access }` y la cookie de sesión |
 | `POST /api/token/refresh/` | Cookie de sesión | Nuevo `{ access }` |
 | `POST /api/token/logout/` | Cookie de sesión | Cierra la sesión (`204`) |
 | `POST /api/auth/recuperar-contrasena/` | Público | Pide un código de verificación para restablecer la contraseña: `email`. Responde siempre `200` con el mismo mensaje |
 | `POST /api/auth/restablecer-contrasena/` | Público | Cambia la contraseña con el código recibido por correo: `email`, `codigo` (6 dígitos) y `nueva_contrasena` |
 | `POST /api/auth/cambiar-contrasena/` | Autenticado | Cambia la contraseña de la cuenta: `contrasena_actual` y `nueva_contrasena` |
-| `GET /api/perfil/` | Autenticado | Datos propios; `debe_aceptar_politica` indica si hay una versión nueva de la política |
+| `GET /api/perfil/` | Autenticado | Datos propios. `debe_aceptar_politica` indica si hay una versión nueva de la política |
 | `PATCH /api/perfil/` | Autenticado | `nombre_completo`, `telefono` o `acepta_politica_privacidad: true` |
 | `GET /api/perfil/baja/` | Autenticado | Vista previa de la baja: qué reservas y turnos fijos se cancelan y cuáles se conservan |
 | `DELETE /api/perfil/` | Autenticado | Baja de la cuenta propia con anonimización de datos personales (`204`) |
 
-El registro, el inicio de sesión y las rutas de contraseña tienen un límite de intentos y responden `429` al superarlo. En el registro y el inicio de sesión se cuenta por origen; en el cambio de contraseña, por cuenta.
+El registro, el inicio de sesión y las rutas de contraseña tienen un límite de intentos y responden `429` al superarlo. En el registro y el inicio de sesión se cuenta por origen. En el cambio de contraseña, por cuenta.
 
 ### Recuperación y cambio de contraseña
 
@@ -73,14 +73,14 @@ Las tres rutas aplican las mismas reglas de contraseña que el registro (`nueva_
 
 - Responde siempre `200` con `{ "detail": "Si el correo está registrado, enviamos un código de verificación válido por 15 minutos." }`, exista o no la cuenta, esté suspendida o dada de baja, o tenga un pedido reciente. La respuesta no permite saber si un correo está registrado.
 - Si la cuenta está activa, recibe por correo un código numérico de 6 dígitos que vence a los 15 minutos y sirve una sola vez. Un código nuevo invalida el anterior, y no se genera otro hasta pasados 60 segundos del último pedido.
-- `400` solo si el correo no tiene un formato válido; `429` al superar el límite de pedidos por origen.
+- `400` solo si el correo no tiene un formato válido. `429` al superar el límite de pedidos por origen.
 
 **Restablecer** (`POST /api/auth/restablecer-contrasena/`, `{ "email", "codigo", "nueva_contrasena" }`):
 
 - `200` con `{ "detail": "Contraseña actualizada. Ya podés iniciar sesión con la nueva." }`. El código queda usado, se cierran todas las sesiones abiertas de la cuenta y se borra la cookie de sesión del navegador.
 - Un código inexistente, incorrecto, vencido, ya usado o bloqueado, una cuenta inexistente o no activa responden el mismo `400` con `{ "error": true, "detail": "El código es inválido o expiró." }`: no se revela por qué falló.
-- Tras 5 intentos fallidos el código se invalida, aunque después llegue el correcto; hay que pedir uno nuevo.
-- Una contraseña que no cumple las reglas responde `400` con el detalle en `nueva_contrasena`; en ese caso el código no se consume ni suma intentos fallidos. El código con formato inválido (no son 6 dígitos) responde `400` con el detalle en `codigo`.
+- Tras 5 intentos fallidos el código se invalida, aunque después llegue el correcto. Hay que pedir uno nuevo.
+- Una contraseña que no cumple las reglas responde `400` con el detalle en `nueva_contrasena`. En ese caso el código no se consume ni suma intentos fallidos. El código con formato inválido (no son 6 dígitos) responde `400` con el detalle en `codigo`.
 - `429` al superar el límite de intentos por origen.
 
 **Cambiar la contraseña con la sesión abierta** (`POST /api/auth/cambiar-contrasena/`, `{ "contrasena_actual", "nueva_contrasena" }`):
@@ -100,7 +100,7 @@ Cada solicitud de código, cada código bloqueado por intentos fallidos, cada re
 }
 ```
 
-- `GET /api/perfil/baja/` no modifica nada; conviene mostrarlo antes de confirmar el `DELETE`. `impedimento` trae el motivo por el que hoy se rechazaría la baja (por ejemplo, ser el único superadministrador o tener contratos vigentes), o `null`.
+- `GET /api/perfil/baja/` no modifica nada. Conviene mostrarlo antes de confirmar el `DELETE`. `impedimento` trae el motivo por el que hoy se rechazaría la baja (por ejemplo, ser el único superadministrador o tener contratos vigentes), o `null`.
 - Al confirmar la baja, las reservas por jugar pendientes de seña o confirmadas se cancelan (`estado = 4`) y sus horarios quedan libres en la grilla.
 - Las señadas o pagadas no se cancelan, porque las resuelve el complejo. En esas reservas se conservan el nombre y el teléfono del titular solo para resolver la seña: se borran al resolverse o, como máximo, 30 días después del turno.
 - Los turnos fijos del titular se dan de baja. El complejo recibe un aviso.
@@ -113,7 +113,7 @@ Cada solicitud de código, cada código bloqueado por intentos fallidos, cada re
 | `GET /api/servicios/` | Público | Servicios disponibles (lista completa, sin paginar) |
 | `GET /api/complejos/` | Público | Complejos habilitados, con coordenadas, servicios, deportes y `precio_desde` |
 | `GET /api/complejos/marcadores/` | Público | Puntos del mapa de los complejos habilitados, con los mismos filtros del listado. Lista completa, sin paginar |
-| `GET /api/complejos/<id>/` | Público | Detalle con sus canchas activas; `404` si el complejo no está habilitado |
+| `GET /api/complejos/<id>/` | Público | Detalle con sus canchas activas. `404` si el complejo no está habilitado |
 | `GET /api/complejos/<id>/grilla/?fecha=AAAA-MM-DD` | Público | Turnos del día por cancha, con precio y estado (respuesta completa, sin paginar) |
 
 Filtros de `GET /api/complejos/` y de `GET /api/complejos/marcadores/`: `deporte` (id), `cobertura` (`1` descubierta, `2` techada, `3` semicubierta), `servicio` (id, repetible: se exigen todos), `search` (nombre o dirección) y `ordering` (`nombre`, `precio_desde`, con `-` para invertir). `deporte` y `cobertura` se cumplen sobre una misma cancha.
@@ -128,7 +128,7 @@ Filtros de `GET /api/complejos/` y de `GET /api/complejos/marcadores/`: `deporte
 
 `precio_desde` es `null` si el complejo no tiene canchas activas. Los decimales llegan como texto, igual que en el listado.
 
-El listado y el detalle informan `porcentaje_sena` (entero de `0` a `100`; `0` significa que el complejo no exige seña) además del texto libre `info_sena`. El alias y el titular para transferir no son públicos: solo los recibe quien reservó, mientras su seña está pendiente.
+El listado y el detalle informan `porcentaje_sena` (entero de `0` a `100`, donde `0` significa que el complejo no exige seña) además del texto libre `info_sena`. El alias y el titular para transferir no son públicos: solo los recibe quien reservó, mientras su seña está pendiente.
 
 ### Grilla del día
 
@@ -152,7 +152,7 @@ El listado y el detalle informan `porcentaje_sena` (entero de `0` a `100`; `0` s
 }
 ```
 
-- Cada rango horario del día genera sus turnos por separado según `duracion_turno_min`; un resto menor a un turno completo no se ofrece. Una cancha sin horario ese día figura con `bloques` vacío.
+- Cada rango horario del día genera sus turnos por separado según `duracion_turno_min`. Un resto menor a un turno completo no se ofrece. Una cancha sin horario ese día figura con `bloques` vacío.
 - `estado`: `LIBRE`, `OCUPADO` (reserva activa o turno fijo), `CERRADO_EXCEPCION`, con el motivo del cierre en `motivo`, o `NO_DISPONIBLE` (un turno de hoy que ya empezó, o de una fecha posterior a los 2 meses de anticipación que admiten las reservas). Si un turno ya ocupado coincide con un cierre, se informa `OCUPADO`.
 - Todo turno `LIBRE` se puede reservar con `POST /api/reservas/`.
 - La respuesta no incluye datos de quien reservó.
@@ -171,7 +171,7 @@ El listado y el detalle informan `porcentaje_sena` (entero de `0` a `100`; `0` s
 - Los mensajes que envía el cliente se ignoran.
 - Un complejo no habilitado o inexistente rechaza la conexión, igual que una página de otro origen.
 - Si la conexión se corta, al reconectar se vuelve a pedir la grilla por REST: los eventos perdidos no se reenvían.
-- Para no recargar de más: ante un evento, pedir la grilla solo si la fecha que se está viendo cae en el rango y `cancha_id` es nulo o es una de las canchas mostradas; y agrupar los eventos que lleguen casi juntos (alrededor de 1 segundo) en una sola recarga.
+- Para no recargar de más: ante un evento, pedir la grilla solo si la fecha que se está viendo cae en el rango y `cancha_id` es nulo o es una de las canchas mostradas, y agrupar los eventos que lleguen casi juntos (alrededor de 1 segundo) en una sola recarga.
 - La grilla tiene su propio límite de solicitudes por origen, más amplio que el del resto de las rutas públicas, y responde `429` al superarlo.
 - Los cambios de canchas y horarios también se anuncian, con `cancha_id`, `fecha_desde` igual a hoy, `fecha_hasta` nulo y horas nulas. Si el complejo deja de estar habilitado, el servidor cierra las conexiones abiertas.
 
@@ -180,7 +180,7 @@ El listado y el detalle informan `porcentaje_sena` (entero de `0` a `100`; `0` s
 | Método y ruta | Acceso | Uso |
 |---|---|---|
 | `POST /api/reservas/` | Jugador | `cancha`, `fecha_turno` (`AAAA-MM-DD`) y `hora_inicio` (`HH:MM`) de un turno libre de la grilla |
-| `GET /api/reservas/mias/` | Jugador | Reservas propias; filtros `estado`, `vigencia` (`proximas` o `pasadas`), `fecha_desde` y `fecha_hasta`; `ordering` por `fecha_turno`, `hora_inicio` o `fecha_creacion` |
+| `GET /api/reservas/mias/` | Jugador | Reservas propias. Filtros `estado`, `vigencia` (`proximas` o `pasadas`), `fecha_desde` y `fecha_hasta`. `ordering` por `fecha_turno`, `hora_inicio` o `fecha_creacion` |
 | `POST /api/reservas/<id>/cancelar/` | Jugador | Cancela una reserva propia (`estado = 4`) |
 | `POST /api/reservas/<id>/informar-transferencia/` | Jugador | `{ "titular", "referencia" }`: avisa al complejo que transfirió la seña de una reserva propia, para que la concilie |
 
@@ -200,22 +200,22 @@ El listado y el detalle informan `porcentaje_sena` (entero de `0` a `100`; `0` s
 ```
 
 - Rutas de jugadores (y del superadmin): dueños y operadores registran reservas desde la agenda.
-- `hora_inicio` debe ser el inicio de un turno de la grilla de esa fecha. `hora_fin` y `precio_acordado` los calcula el servidor según la cancha y su horario; si se envían, se ignoran. La reserva nace pendiente de seña (`estado = 1`).
+- `hora_inicio` debe ser el inicio de un turno de la grilla de esa fecha. `hora_fin` y `precio_acordado` los calcula el servidor según la cancha y su horario. Si se envían, se ignoran. La reserva nace pendiente de seña (`estado = 1`).
 - Se reserva con hasta 2 meses calendario de anticipación (por ejemplo, el 16/11 hasta el 16/01 inclusive).
-- `400`: turno pasado o ya iniciado, fecha más allá de la anticipación máxima, horario que no es un turno de la cancha, cancha no disponible o complejo no habilitado. `409`: el turno ya está reservado, lo ocupa un turno fijo o lo cierra una excepción; el mensaje indica cuál.
-- Las altas tienen un límite de solicitudes por cuenta y responden `429` al superarlo; consultar y cancelar no cuentan.
-- `vigencia=proximas` incluye las reservas cuyo turno todavía no terminó (la de hoy en curso también); `pasadas`, las ya terminadas.
-- Solo se cancelan reservas en `1`, `2` o `3`, y si faltan más horas que el margen del complejo (`horas_limite_cancelacion`) para el inicio del turno; `cancelable_hasta` informa el límite. Fuera de margen responde `400`. Una reserva de otra cuenta responde `404`.
+- `400`: turno pasado o ya iniciado, fecha más allá de la anticipación máxima, horario que no es un turno de la cancha, cancha no disponible o complejo no habilitado. `409`: el turno ya está reservado, lo ocupa un turno fijo o lo cierra una excepción. El mensaje indica cuál.
+- Las altas tienen un límite de solicitudes por cuenta y responden `429` al superarlo. Consultar y cancelar no cuentan.
+- `vigencia=proximas` incluye las reservas cuyo turno todavía no terminó (la de hoy en curso también). `pasadas`, las ya terminadas.
+- Solo se cancelan reservas en `1`, `2` o `3`, y si faltan más horas que el margen del complejo (`horas_limite_cancelacion`) para el inicio del turno. `cancelable_hasta` informa el límite. Fuera de margen responde `400`. Una reserva de otra cuenta responde `404`.
 - `estado`: `1` pendiente de seña, `2` confirmada, `3` señada o pagada, `4` cancelada por el jugador, `5` cancelada por el complejo, `6` ausente, `7` completada.
 - **Montos:** `precio_acordado` es el precio total. Al reservar, el servidor calcula y congela `monto_sena` (el `porcentaje_sena` del complejo aplicado al precio, redondeado al centavo con la mitad hacia arriba) y deja `monto_pagado` en `0.00`. Un cambio posterior del precio de la cancha o del porcentaje de seña no altera las reservas ya registradas. `saldo_restante` es `precio_acordado - monto_pagado`. Un complejo que no exige seña devuelve `monto_sena: "0.00"` y la reserva nace igual, pendiente (`estado = 1`).
 - **`estado_pago`:** se deduce de los montos. `1` sin seña, `2` seña pendiente, `3` seña abonada y `4` pagada.
 - **Aviso de transferencia:** `informar-transferencia/` (también para reenviar tras un rechazo) solo lo usa el titular de la reserva y solo mientras la seña está pendiente (reserva pendiente o confirmada, con seña acordada y sin abonar). Informar **no confirma ningún pago**: la seña la sigue confirmando el personal, con o sin aviso previo.
-  - `titular` (nombre de quien transfirió, que puede ser otra persona; 2 a 100 caracteres, con al menos dos letras) y `referencia` (número de operación o comprobante; 3 a 60 caracteres: letras, números y `.` `_` `/` `-`, sin espacios, empezando por una letra o un número). Ambos se limpian de HTML y se colapsan los espacios. No se piden DNI ni otros datos.
+  - `titular` (nombre de quien transfirió, que puede ser otra persona, de 2 a 100 caracteres y con al menos dos letras) y `referencia` (número de operación o comprobante, de 3 a 60 caracteres: letras, números y `.` `_` `/` `-`, sin espacios, empezando por una letra o un número). Ambos se limpian de HTML y se colapsan los espacios. No se piden DNI ni otros datos.
   - Se puede reenviar para corregir mientras la seña siga pendiente. Repetir exactamente los mismos datos responde `200` sin cambios ni nuevo aviso. Responde la reserva actualizada.
   - `400` si faltan datos o son inválidos (el detalle indica el campo), o si la reserva está cancelada, ausente, completada, ya señada o pagada, o no exige seña. `401` sin sesión, `403` para quien no es jugador y `404` si la reserva no es del usuario. Las altas y correcciones tienen un límite por cuenta y responden `429` al superarlo.
   - Cada alta o corrección avisa al dueño y a los operadores activos del complejo y queda en el registro del complejo, con el turno y sin los datos informados.
-  - `transferencia_informada` indica si hay un aviso y `transferencia` trae `titular`, `referencia`, `informada_en` y `rechazo` (o `null`). Si el complejo rechazó el aviso, `transferencia_rechazada` es verdadero y `rechazo` trae el motivo y la nota para que el jugador la informe de nuevo. Solo los ven el jugador titular y el personal de ese complejo en la agenda; nunca aparecen en rutas públicas ni para otros jugadores o complejos. Se conservan a la vista del titular también con la seña ya confirmada.
-- **`datos_transferencia`:** `{ "alias", "titular" }` del complejo mientras la reserva está pendiente o confirmada y su seña sigue pendiente de pago; en cualquier otro caso es `null`. `titular` y `cbu` (CBU o CVU opcional del complejo, como otra forma de transferir) pueden ser cadenas vacías.
+  - `transferencia_informada` indica si hay un aviso y `transferencia` trae `titular`, `referencia`, `informada_en` y `rechazo` (o `null`). Si el complejo rechazó el aviso, `transferencia_rechazada` es verdadero y `rechazo` trae el motivo y la nota para que el jugador la informe de nuevo. Solo los ven el jugador titular y el personal de ese complejo en la agenda. Nunca aparecen en rutas públicas ni para otros jugadores o complejos. Se conservan a la vista del titular también con la seña ya confirmada.
+- **`datos_transferencia`:** `{ "alias", "titular" }` del complejo mientras la reserva está pendiente o confirmada y su seña sigue pendiente de pago. En cualquier otro caso es `null`. `titular` y `cbu` (CBU o CVU opcional del complejo, como otra forma de transferir) pueden ser cadenas vacías.
 
 ## Administración del complejo
 
@@ -229,38 +229,38 @@ El listado y el detalle informan `porcentaje_sena` (entero de `0` a `100`; `0` s
 | `POST /api/complejos/<id>/operadores/` | Dueño | `{ "email" }` de una cuenta de operador sin complejo asignado |
 | `DELETE /api/complejos/<id>/operadores/<usuario_id>/` | Dueño | Desvincula al operador (la cuenta sigue activa) |
 
-- **Seña por transferencia:** `porcentaje_sena` es un entero de `0` a `100` (`0` no exige seña). Con un porcentaje mayor a cero el complejo necesita `alias_transferencia`; si falta, `400` sobre ese campo, también al intentar vaciar el alias mientras se exige seña. El alias mide entre 6 y 20 caracteres, admite letras, números, puntos y guiones, sin espacios, y se guarda en mayúsculas. `titular_transferencia` es opcional (hasta 120 caracteres). `cbu_cvu_transferencia` es opcional y no depende de la seña: son 22 dígitos (al enviarlo se ignoran espacios y guiones) y se controlan sus dos dígitos verificadores, para no aceptar un número mal tipeado; vacío lo borra. Todos los textos se limpian de HTML. Las respuestas del complejo administrado incluyen los tres campos.
+- **Seña por transferencia:** `porcentaje_sena` es un entero de `0` a `100` (`0` no exige seña). Con un porcentaje mayor a cero el complejo necesita `alias_transferencia`. Si falta, `400` sobre ese campo, también al intentar vaciar el alias mientras se exige seña. El alias mide entre 6 y 20 caracteres, admite letras, números, puntos y guiones, sin espacios, y se guarda en mayúsculas. `titular_transferencia` es opcional (hasta 120 caracteres). `cbu_cvu_transferencia` es opcional y no depende de la seña: son 22 dígitos (al enviarlo se ignoran espacios y guiones) y se controlan sus dos dígitos verificadores, para no aceptar un número mal tipeado. Vacío lo borra. Todos los textos se limpian de HTML. Las respuestas del complejo administrado incluyen los tres campos.
 - Cambiar el porcentaje solo rige para las reservas nuevas. La auditoría registra los nombres de los campos modificados, nunca el alias.
 
 ### Canchas
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
-| `GET /api/canchas/` | Operador | Canchas vigentes; filtros `complejo`, `deporte`, `estado` (`1` activa, `2` en mantenimiento); `ordering` por `nombre` o `precio_base` |
+| `GET /api/canchas/` | Operador | Canchas vigentes. Filtros `complejo`, `deporte`, `estado` (`1` activa, `2` en mantenimiento). `ordering` por `nombre` o `precio_base` |
 | `GET /api/canchas/<id>/` | Operador | Detalle |
 | `POST /api/canchas/` | Dueño | `complejo`, `deporte`, `nombre`, `tipo_superficie`, `cobertura`, `iluminacion`, `duracion_turno_min` (`60`, `90` o `120`), `precio_base` |
-| `PATCH /api/canchas/<id>/` | Dueño | Cualquier campo salvo `complejo`; `estado` admite `1` o `2`. Con `confirmar` (ver abajo) |
-| `DELETE /api/canchas/<id>/` | Dueño | Baja; `400` si tiene reservas o turnos fijos vigentes, sin confirmación posible |
+| `PATCH /api/canchas/<id>/` | Dueño | Cualquier campo salvo `complejo`. `estado` admite `1` o `2`. Con `confirmar` (ver abajo) |
+| `DELETE /api/canchas/<id>/` | Dueño | Baja. `400` si tiene reservas o turnos fijos vigentes, sin confirmación posible |
 
 ### Horarios de apertura
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
-| `GET /api/horarios/` | Operador | Rangos vigentes; filtros `cancha` y `dia_semana` (`0` lunes a `6` domingo) |
+| `GET /api/horarios/` | Operador | Rangos vigentes. Filtros `cancha` y `dia_semana` (`0` lunes a `6` domingo) |
 | `GET /api/horarios/<id>/` | Operador | Detalle |
 | `POST /api/horarios/` | Dueño | `cancha`, `dia_semana`, `hora_apertura`, `hora_cierre` (`HH:MM`) y `precio_diferenciado` opcional |
 | `PATCH /api/horarios/<id>/` | Dueño | Cualquier campo salvo `cancha`. Con `confirmar` (ver abajo) |
-| `DELETE /api/horarios/<id>/` | Dueño | Baja del rango; `?confirmar=true` o `{ "confirmar": true }` (ver abajo) |
+| `DELETE /api/horarios/<id>/` | Dueño | Baja del rango. `?confirmar=true` o `{ "confirmar": true }` (ver abajo) |
 
-Un día admite varios rangos por cancha mientras no se superpongan; `hora_cierre` debe ser posterior a `hora_apertura`. Sin `precio_diferenciado` rige el `precio_base` de la cancha.
+Un día admite varios rangos por cancha mientras no se superpongan. `hora_cierre` debe ser posterior a `hora_apertura`. Sin `precio_diferenciado` rige el `precio_base` de la cancha.
 
 ### Cambios que afectan reservas futuras
 
 Los cambios de operatoria se revisan antes de aplicarse:
-- editar el día o el horario de un rango;
-- darlo de baja;
-- cambiar `duracion_turno_min`;
-- pasar una cancha a mantenimiento.
+- editar el día o el horario de un rango
+- darlo de baja
+- cambiar `duracion_turno_min`
+- pasar una cancha a mantenimiento
 
 Si el cambio deja reservas por jugar (pendientes, confirmadas o señadas) o turnos fijos fuera de los turnos de la grilla, responde `409` sin aplicar nada:
 
@@ -286,13 +286,13 @@ Si el cambio deja reservas por jugar (pendientes, confirmadas o señadas) o turn
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
-| `GET /api/excepciones/` | Operador | Excepciones activas; filtros `complejo`, `cancha` (incluye las de todo su complejo), `vigencia` (`vigentes` o `finalizadas`), `fecha` (`AAAA-MM-DD`, las que la cubren) y `tipo_motivo`; `ordering` por `fecha_inicio` o `fecha_creacion` |
+| `GET /api/excepciones/` | Operador | Excepciones activas. Filtros `complejo`, `cancha` (incluye las de todo su complejo), `vigencia` (`vigentes` o `finalizadas`), `fecha` (`AAAA-MM-DD`, las que la cubren) y `tipo_motivo`. `ordering` por `fecha_inicio` o `fecha_creacion` |
 | `GET /api/excepciones/<id>/` | Operador | Detalle |
 | `POST /api/excepciones/` | Operador | `complejo`, `cancha` (opcional), `fecha_inicio`, `fecha_fin`, `es_dia_completo`, `hora_inicio`, `hora_fin`, `tipo_motivo` y `descripcion` (opcional) |
 | `DELETE /api/excepciones/<id>/` | Operador | Baja de la excepción (`204`) |
 
-- Sin `cancha`, la excepción cierra todo el complejo; con `cancha`, debe ser una cancha activa de ese complejo.
-- `es_dia_completo`: `1` cierra el día entero y no lleva horas; `0` es una franja y exige `hora_inicio` y `hora_fin` (`HH:MM`), con el fin posterior al inicio.
+- Sin `cancha`, la excepción cierra todo el complejo. Con `cancha`, debe ser una cancha activa de ese complejo.
+- `es_dia_completo`: `1` cierra el día entero y no lleva horas. `0` es una franja y exige `hora_inicio` y `hora_fin` (`HH:MM`), con el fin posterior al inicio.
 - `fecha_fin` debe ser igual o posterior a `fecha_inicio`, que no puede ser anterior a hoy. El rango tiene una extensión máxima.
 - `tipo_motivo`: `1` mantenimiento, `2` condiciones climáticas, `3` feriado, `4` evento privado, `5` corte de servicio, `6` otro.
 - No se editan: para corregir una excepción se da de baja y se registra otra.
@@ -301,29 +301,29 @@ Si el cambio deja reservas por jugar (pendientes, confirmadas o señadas) o turn
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
-| `GET /api/agenda/` | Operador | Reservas de los complejos administrados, con el contacto del cliente; filtros `complejo`, `cancha`, `fecha`, `fecha_desde`, `fecha_hasta`, `estado` y `tipo_ocupacion` (`1` web, `2` manual, `3` turno fijo); `ordering` por `fecha_turno`, `hora_inicio` o `fecha_creacion` |
+| `GET /api/agenda/` | Operador | Reservas de los complejos administrados, con el contacto del cliente. Filtros `complejo`, `cancha`, `fecha`, `fecha_desde`, `fecha_hasta`, `estado` y `tipo_ocupacion` (`1` web, `2` manual, `3` turno fijo). `ordering` por `fecha_turno`, `hora_inicio` o `fecha_creacion` |
 | `GET /api/agenda/<id>/` | Operador | Detalle |
 | `POST /api/agenda/` | Operador | Reserva telefónica o presencial: `cancha`, `fecha_turno`, `hora_inicio`, `nombre_cliente_manual` y, opcionales, `telefono_cliente_manual` y `observaciones` |
 | `PATCH /api/agenda/<id>/` | Operador | `estado` y `observaciones` |
 | `POST /api/agenda/<id>/cancelar/` | Operador | Cancela la reserva (`estado = 5`) sin restricción horaria |
 | `POST /api/agenda/<id>/reabrir/` | Operador | `{ "estado", "confirmar" }`: reabre una reserva cancelada por error (`estado`: `1`, `2` o `3`) |
 | `POST /api/agenda/<id>/confirmar-sena/` | Operador | Registra que el complejo recibió la seña: `monto_pagado` pasa a `monto_sena` y la reserva a señada (`estado = 3`). Sin cuerpo |
-| `POST /api/agenda/<id>/rechazar-transferencia/` | Operador | `{ "motivo", "nota" }`: rechaza la transferencia que informó el jugador (`motivo` de la lista: `1` no llegó, `2` monto incorrecto, `3` datos incorrectos, `4` otro; `nota` opcional de hasta 120 caracteres) y le pide que la informe de nuevo |
+| `POST /api/agenda/<id>/rechazar-transferencia/` | Operador | `{ "motivo", "nota" }`: rechaza la transferencia que informó el jugador (`motivo` de la lista: `1` no llegó, `2` monto incorrecto, `3` datos incorrectos, `4` otro. `nota` opcional de hasta 120 caracteres) y le pide que la informe de nuevo |
 | `POST /api/agenda/<id>/anular-cobro/` | Dueño | Deja sin efecto lo cobrado (seña o pago total) de una reserva: `monto_pagado` vuelve a `0.00`. Sin cuerpo |
 | `POST /api/agenda/<id>/registrar-pago/` | Operador | Registra el cobro del total: `monto_pagado` pasa a `precio_acordado`. Sin cuerpo |
 
-- Cada reserva trae `cliente`: `{ "nombre", "telefono", "email" }`. Es la cuenta del jugador si reservó en la web; si se cargó a mano, `email` es `null`. Si el titular dio de baja su cuenta, figura el contacto conservado para resolver una seña, o "Titular dado de baja".
-- `conflicto_operatoria` trae el motivo por el que una reserva por jugar quedó fuera de la grilla tras un cambio de horarios, de duración o el paso a mantenimiento, o `null`. `?con_conflicto=true` lista solo esas reservas; la marca desaparece al resolverlas.
+- Cada reserva trae `cliente`: `{ "nombre", "telefono", "email" }`. Es la cuenta del jugador si reservó en la web. Si se cargó a mano, `email` es `null`. Si el titular dio de baja su cuenta, figura el contacto conservado para resolver una seña, o "Titular dado de baja".
+- `conflicto_operatoria` trae el motivo por el que una reserva por jugar quedó fuera de la grilla tras un cambio de horarios, de duración o el paso a mantenimiento, o `null`. `?con_conflicto=true` lista solo esas reservas. La marca desaparece al resolverlas.
 - El alta manual sigue las mismas reglas que la reserva web (turno de la grilla, futuro, dentro de la anticipación máxima y libre) y responde `409` ante un choque. Una cancha de otro complejo responde `403`.
-- `observaciones` (hasta 255 caracteres, texto plano: se limpia de HTML y se recortan los espacios de los extremos; vacío las borra) se edita con `PATCH` en cualquier estado de la reserva, también cancelada, ausente o completada, y no cambia su estado ni sus montos. Las ve solo el personal del complejo: no figuran en las reservas del jugador ni en la auditoría. Una reserva de otro complejo responde `404`.
-- En `PATCH`, `cancha`, `fecha_turno`, `hora_inicio`, `hora_fin` y `precio_acordado` no se editan: enviados con otro valor responden `400` con el motivo; con el mismo valor se aceptan. Para cambiar el turno se cancela la reserva y se registra otra.
-- `estado` en `PATCH` admite `1` pendiente, `2` confirmada, `3` señada, `6` ausente y `7` completada. Pendiente, confirmada y señada se mueven entre sí en cualquier sentido, para corregir un error de carga (mover el estado no modifica los montos: el pago se sigue con `monto_pagado`), y desde cualquiera de ellas se pasa a ausente o completada; ausente y completada se corrigen entre sí. Pedir el estado que la reserva ya tiene responde `200` sin cambios. Ausente y completada exigen que el turno haya empezado. Una reserva cancelada no cambia de estado por `PATCH`: se reabre con `reabrir/`.
+- `observaciones` (hasta 255 caracteres, texto plano: se limpia de HTML y se recortan los espacios de los extremos. Vacío las borra) se edita con `PATCH` en cualquier estado de la reserva, también cancelada, ausente o completada, y no cambia su estado ni sus montos. Las ve solo el personal del complejo: no figuran en las reservas del jugador ni en la auditoría. Una reserva de otro complejo responde `404`.
+- En `PATCH`, `cancha`, `fecha_turno`, `hora_inicio`, `hora_fin` y `precio_acordado` no se editan: enviados con otro valor responden `400` con el motivo. Con el mismo valor se aceptan. Para cambiar el turno se cancela la reserva y se registra otra.
+- `estado` en `PATCH` admite `1` pendiente, `2` confirmada, `3` señada, `6` ausente y `7` completada. Pendiente, confirmada y señada se mueven entre sí en cualquier sentido, para corregir un error de carga (mover el estado no modifica los montos: el pago se sigue con `monto_pagado`), y desde cualquiera de ellas se pasa a ausente o completada. Ausente y completada se corrigen entre sí. Pedir el estado que la reserva ya tiene responde `200` sin cambios. Ausente y completada exigen que el turno haya empezado. Una reserva cancelada no cambia de estado por `PATCH`: se reabre con `reabrir/`.
 - `reabrir/` solo acepta reservas canceladas (`4` o `5`) de turnos que todavía no empezaron, y no las de una cuenta dada de baja.
   - **Validación:** vuelve a validar el turno como un alta. Si lo tomó otra reserva o un turno fijo, lo cerró una excepción, la cancha cambió de horario o dejó de estar disponible, responde `409` sin opción de confirmar.
   - **Confirmación:** si el turno está libre y no se envía `confirmar: true`, responde `409` con `requiere_confirmacion: true` y una `vista_previa` (`id`, `fecha_turno`, `hora_inicio`, `hora_fin`, `estado_actual`, `estado_nuevo`). Con `confirmar: true` la reserva vuelve a ocupar su turno.
 - Las reservas no se borran: se cancelan.
 - **Seña y pago:** cada reserva de la agenda trae `monto_sena`, `monto_pagado`, `saldo_restante`, `estado_pago` y `estado_pago_nombre` (mismos valores que en las reservas del jugador, sin `datos_transferencia`), y dos indicadores que dicen qué admite hoy el servidor: `puede_confirmar_sena` y `puede_registrar_pago`. Incluye también `transferencia_informada` y `transferencia`, para que el personal compare lo que informó el jugador con su cuenta antes de confirmar.
-  - `confirmar-sena/` pide una reserva pendiente o confirmada con seña acordada y todavía sin abonar. `registrar-pago/` pide una reserva pendiente, confirmada, señada o completada con saldo; tras el cobro, una reserva pendiente o confirmada con seña acordada pasa a señada (`estado = 3`); sin seña, una pendiente pasa a confirmada (`estado = 2`) y una confirmada o completada conserva su estado, con `estado_pago = 4`. Ambas responden la reserva actualizada y avisan al titular y al resto del personal.
+  - `confirmar-sena/` pide una reserva pendiente o confirmada con seña acordada y todavía sin abonar. `registrar-pago/` pide una reserva pendiente, confirmada, señada o completada con saldo. Tras el cobro, una reserva pendiente o confirmada con seña acordada pasa a señada (`estado = 3`). Sin seña, una pendiente pasa a confirmada (`estado = 2`) y una confirmada o completada conserva su estado, con `estado_pago = 4`. Ambas responden la reserva actualizada y avisan al titular y al resto del personal.
   - `400` si la reserva está cancelada o ausente, si ya está señada o saldada, o si no exige seña (`confirmar-sena/`). `403` sin permiso de gestión de la agenda y `404` si la reserva es de un complejo que el usuario no administra. Registrar el mismo cobro dos veces no suma: la segunda respuesta es `400`.
   - El estado señada (`3`) solo existe para una reserva con seña acordada (`monto_sena` mayor a cero): `PATCH` con `estado = 3` o `reabrir/` con `estado = 3` sobre una reserva sin seña responden `400`, y se la confirma (`2`) o se registra el pago total. Pasar una reserva con seña a señada con `PATCH` o al reabrirla deja abonada la seña, para que los montos sigan coherentes. Una reserva señada anterior a las señas, sin montos, sigue pudiendo pasar a ausente o completada.
   - Cada cobro, y cada anulación de un cobro, queda en la auditoría como "Cobro de reserva" (tipo de evento `18`), con ids, montos y estados, sin datos personales. Cada aviso, corrección, reenvío o rechazo de una transferencia queda como "Transferencia de seña" (tipo `19`), con ids y la acción realizada (y el motivo de la lista en un rechazo), sin el nombre, el número de operación ni la nota.
@@ -337,27 +337,27 @@ Si el cambio deja reservas por jugar (pendientes, confirmadas o señadas) o turn
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
-| `GET /api/turnos-fijos/` | Operador | Turnos fijos vigentes y pausados, con el contacto del cliente; filtros `cancha`, `complejo`, `dia_semana`, `estado` (`1` vigente, `2` pausado) y `fecha` (los que caen ese día) |
+| `GET /api/turnos-fijos/` | Operador | Turnos fijos vigentes y pausados, con el contacto del cliente. Filtros `cancha`, `complejo`, `dia_semana`, `estado` (`1` vigente, `2` pausado) y `fecha` (los que caen ese día) |
 | `GET /api/turnos-fijos/<id>/` | Operador | Detalle |
 | `POST /api/turnos-fijos/` | Operador | `cancha`, `dia_semana`, `hora_inicio`, `fecha_inicio_vigencia`, `fecha_fin_vigencia` (opcional, sin fin si es nula), `nombre_cliente_manual` y `telefono_cliente_manual` (opcional) |
 | `PATCH /api/turnos-fijos/<id>/` | Operador | `estado` (`1` o `2`), `fecha_fin_vigencia`, `hora_inicio` (con `confirmar`), `nombre_cliente_manual` y `telefono_cliente_manual` |
 | `DELETE /api/turnos-fijos/<id>/` | Operador | Baja del turno fijo (`204`) |
-| `POST /api/turnos-fijos/<id>/fechas/` | Operador | `{ "fecha_turno", "accion" }`: lleva esa fecha a la agenda (`tipo_ocupacion = 3`); `accion` `mantener` (por defecto, confirmada) o `cancelar` (cancelada por el complejo) |
+| `POST /api/turnos-fijos/<id>/fechas/` | Operador | `{ "fecha_turno", "accion" }`: lleva esa fecha a la agenda (`tipo_ocupacion = 3`). `accion` `mantener` (por defecto, confirmada) o `cancelar` (cancelada por el complejo) |
 
 - `hora_fin` la calcula el servidor según la duración del turno de la cancha, y `hora_inicio` debe ser el inicio de un turno de la grilla ese día de la semana. La vigencia empieza hoy o después e incluye al menos una fecha de ese día.
-- `409` si en alguna fecha futura de la vigencia choca con otro turno fijo vigente o una reserva activa; el mensaje indica la fecha o el horario. Una excepción no lo impide: esas fechas quedan en espera (ver abajo).
-- La cancha, el día y el inicio de la vigencia no se editan: enviados con otro valor responden `400` con el motivo; con el mismo valor se aceptan. Pausar (`estado = 2`) libera el horario; reanudar y extender `fecha_fin_vigencia` vuelven a validar choques (`409`).
+- `409` si en alguna fecha futura de la vigencia choca con otro turno fijo vigente o una reserva activa. El mensaje indica la fecha o el horario. Una excepción no lo impide: esas fechas quedan en espera (ver abajo).
+- La cancha, el día y el inicio de la vigencia no se editan: enviados con otro valor responden `400` con el motivo. Con el mismo valor se aceptan. Pausar (`estado = 2`) libera el horario. Reanudar y extender `fecha_fin_vigencia` vuelven a validar choques (`409`).
 - **Cambio de horario** (`hora_inicio`):
-  - **Validación:** el nuevo horario debe ser un turno de la grilla ese día (si no, `400`); `hora_fin` se recalcula. Se valida contra otros turnos fijos y reservas en toda la vigencia (`409` sin opción de confirmar).
+  - **Validación:** el nuevo horario debe ser un turno de la grilla ese día (si no, `400`). `hora_fin` se recalcula. Se valida contra otros turnos fijos y reservas en toda la vigencia (`409` sin opción de confirmar).
   - **Confirmación:** sin `confirmar: true` responde `409` con `requiere_confirmacion` y una `vista_previa` (`horario_actual`, `horario_nuevo`, `rige_desde` y `fechas_registradas`).
   - **Fechas ya registradas:** conservan el horario anterior y se resuelven desde la agenda.
-- `?fecha=` trae los vigentes y los pausados que caen ese día; con `estado=1`, solo los vigentes. `?en_espera=true` trae los que tienen fechas en espera.
+- `?fecha=` trae los vigentes y los pausados que caen ese día. Con `estado=1`, solo los vigentes. `?en_espera=true` trae los que tienen fechas en espera.
 - **Fechas en espera** (`fechas_en_espera: [{ "fecha", "motivo" }]`):
   - **Qué son:** las fechas de un turno fijo vigente que cubre una excepción activa (por ejemplo, un feriado), aunque se haya cargado después del turno fijo, y que el complejo todavía no decidió.
   - **Mientras esperan:** siguen ocupadas en la grilla.
-  - **Cómo se deciden:** con `fechas/` y `accion`. `mantener` registra la fecha confirmada; `cancelar` la registra cancelada y el cierre de la excepción vuelve a regir. En los dos casos deja de estar en espera.
+  - **Cómo se deciden:** con `fechas/` y `accion`. `mantener` registra la fecha confirmada. `cancelar` la registra cancelada y el cierre de la excepción vuelve a regir. En los dos casos deja de estar en espera.
   - **Aviso:** crear una excepción que deja fechas en espera genera un aviso urgente para el complejo.
-- Un turno fijo vigente ocupa su horario en cada fecha de su vigencia. Para operar una fecha puntual (señarla, completarla o cancelarla) se registra con `fechas/` y se gestiona desde la agenda; cancelarla libera solo ese día. La fecha debe ser de ese día de la semana y estar dentro de la vigencia; si ya se registró, responde `409`.
+- Un turno fijo vigente ocupa su horario en cada fecha de su vigencia. Para operar una fecha puntual (señarla, completarla o cancelarla) se registra con `fechas/` y se gestiona desde la agenda. Cancelarla libera solo ese día. La fecha debe ser de ese día de la semana y estar dentro de la vigencia. Si ya se registró, responde `409`.
 - La baja no cancela las fechas ya registradas en la agenda.
 - `conflicto_operatoria`: igual que en la agenda, marca los turnos fijos vigentes o pausados que un cambio de operatoria dejó fuera de la grilla.
 
@@ -368,9 +368,9 @@ Si el cambio deja reservas por jugar (pendientes, confirmadas o señadas) o turn
 | `GET /api/reportes/dashboard/` | Dueño | Dashboard de un complejo en un rango de fechas: `complejo`, `fecha_desde` y `fecha_hasta` (`AAAA-MM-DD`, obligatorios), `criterio` y, opcionales, `cancha_id` y `deporte_id` |
 
 - `criterio` indica qué fecha de la reserva se compara con el rango: `fecha_turno` (por defecto, el día que se juega), `fecha_creacion` (el día que se registró) o `fecha_modificacion` (el último cambio, por ejemplo una cancelación).
-- El rango incluye ambos extremos, `fecha_hasta` no puede ser anterior a `fecha_desde` y abarca como máximo 366 días; si no, responde `400`.
-- `cancha_id` debe ser una cancha del complejo, incluidas las que están en mantenimiento o dadas de baja, que conservan su historial; si no, responde `400`. `deporte_id` debe ser un deporte existente. Ambos filtros se combinan.
-- Se consulta también con el contrato pendiente o suspendido. Un complejo dado de baja o ajeno responde `404`; el operador no accede a los reportes (`403`).
+- El rango incluye ambos extremos, `fecha_hasta` no puede ser anterior a `fecha_desde` y abarca como máximo 366 días. Si no, responde `400`.
+- `cancha_id` debe ser una cancha del complejo, incluidas las que están en mantenimiento o dadas de baja, que conservan su historial. Si no, responde `400`. `deporte_id` debe ser un deporte existente. Ambos filtros se combinan.
+- Se consulta también con el contrato pendiente o suspendido. Un complejo dado de baja o ajeno responde `404`. El operador no accede a los reportes (`403`).
 - Con `fecha_creacion` y `fecha_modificacion`, los días se cuentan en hora de Argentina: una reserva registrada el 30/11 a las 23:30 entra en noviembre.
 - La respuesta incluye `filtros` con los valores aplicados, ya normalizados, y las métricas del rango:
 
@@ -396,7 +396,7 @@ Si el cambio deja reservas por jugar (pendientes, confirmadas o señadas) o turn
 }
 ```
 
-- `recaudacion.total` suma `precio_acordado` de las reservas confirmadas, señadas y completadas (`2`, `3` y `7`); `recaudacion.senada`, solo las señadas, que también forman parte del total. Los montos van como texto con dos decimales, igual que los precios del resto de la API, y un rango sin reservas devuelve `"0.00"`. Las reservas manuales y las fechas registradas de turnos fijos cuentan igual que las web.
+- `recaudacion.total` suma `precio_acordado` de las reservas confirmadas, señadas y completadas (`2`, `3` y `7`). `recaudacion.senada`, solo las señadas, que también forman parte del total. Los montos van como texto con dos decimales, igual que los precios del resto de la API, y un rango sin reservas devuelve `"0.00"`. Las reservas manuales y las fechas registradas de turnos fijos cuentan igual que las web.
 - `conteos` trae la cantidad de reservas de cada estado en el rango, con las canceladas por el jugador (`4`) y por el complejo (`5`) por separado y su suma en `canceladas_total`. Un rango vacío devuelve ceros. Con `criterio=fecha_modificacion`, por ejemplo, responde cuántas reservas se cancelaron en el período, aunque el turno fuera para más adelante.
 - `ocupacion` trae una fila por cancha del complejo (con los filtros de cancha y deporte), ordenadas por nombre:
   - **Oferta:** `minutos_ofertables` suma, día por día, los turnos completos que ofrecería la grilla según los horarios de apertura vigentes y la duración del turno, menos los que cierra una excepción activa. Un turno tomado cuenta como ofrecido aunque después se haya cargado un cierre o cambiado el horario.
@@ -410,15 +410,15 @@ Si el cambio deja reservas por jugar (pendientes, confirmadas o señadas) o turn
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
-| `POST /graphql/` | Público; cada campo aplica sus permisos | `{ "query", "variables" }` en JSON |
+| `POST /graphql/` | Público. Cada campo aplica sus permisos | `{ "query", "variables" }` en JSON |
 
 Capa de consulta alternativa a REST con tres consultas y una mutación: `catalogoComplejos`, `detalleComplejo`, `misReservas` y `crearReserva`. Cada una ejecuta la misma acción de la API REST (mismos permisos, filtros, paginación, validaciones y auditoría), así que las dos APIs no pueden dar resultados distintos. Lo que agrega es elegir los campos de la respuesta y combinar en una sola consulta datos de los dos backends.
 
 - Usa el mismo access token que REST en `Authorization: Bearer <access>`. Igual que en las rutas públicas de REST, un token inválido o vencido no impide consultar los campos públicos.
 - Solo admite POST: GET responde `405`.
-- Cada operación admite como máximo 5 campos de primer nivel, contando alias y fragmentos, y la profundidad de anidamiento está limitada; si se excede, responde `400` sin ejecutar nada. La introspección del esquema está deshabilitada en producción.
-- El endpoint tiene su propio límite de solicitudes por cuenta (o por IP sin sesión), además de los de cada operación; al superarlo responde `429` con el encabezado `Retry-After`.
-- Los errores de un campo responden HTTP 200 con `data` en `null` para ese campo y la lista `errors`; cada error lleva el código HTTP equivalente en `extensions.codigo` (`400`, `401`, `403`, `404`, `429`) y, en los de validación, el detalle por campo en `extensions.detalle`. Una consulta mal formada o con campos inexistentes responde `400`.
+- Cada operación admite como máximo 5 campos de primer nivel, contando alias y fragmentos, y la profundidad de anidamiento está limitada. Si se excede, responde `400` sin ejecutar nada. La introspección del esquema está deshabilitada en producción.
+- El endpoint tiene su propio límite de solicitudes por cuenta (o por IP sin sesión), además de los de cada operación. Al superarlo responde `429` con el encabezado `Retry-After`.
+- Los errores de un campo responden HTTP 200 con `data` en `null` para ese campo y la lista `errors`. Cada error lleva el código HTTP equivalente en `extensions.codigo` (`400`, `401`, `403`, `404`, `429`) y, en los de validación, el detalle por campo en `extensions.detalle`. Una consulta mal formada o con campos inexistentes responde `400`.
 
 ### `catalogoComplejos`
 
@@ -471,7 +471,7 @@ query {
 ```
 
 - Cada reserva expone los campos de REST en camelCase: `id`, `complejo`, `cancha`, `deporte`, `fechaTurno`, `horaInicio`, `horaFin`, `precioAcordado`, `montoSena`, `montoPagado`, `saldoRestante`, `estadoPago`, `estadoPagoNombre`, `datosTransferencia` (`alias`, `titular` y `cbu`, o `null`), `transferenciaInformada`, `transferenciaRechazada` y `transferencia` (`titular`, `referencia`, `informadaEn` y `rechazo`, o `null`), `tipoOcupacion`, `tipoOcupacionNombre`, `estado`, `estadoNombre`, `cancelableHasta` y `fechaCreacion`. Fechas y horas llegan como texto con el mismo formato que REST.
-- Sin token, o con un token inválido o vencido, el campo responde `null` con un error `401` y el mismo mensaje que REST; los campos públicos de la misma consulta se resuelven igual. Dueños y operadores reciben `403`.
+- Sin token, o con un token inválido o vencido, el campo responde `null` con un error `401` y el mismo mensaje que REST. Los campos públicos de la misma consulta se resuelven igual. Dueños y operadores reciben `403`.
 
 ### `crearReserva` (mutation)
 
@@ -518,16 +518,16 @@ Servicio de actividad y notificaciones, con su propia URL base. Su documentació
 | `PATCH /api/actividad/notificaciones/mias/leidas` | Cualquier usuario con sesión | Sin cuerpo ni parámetros: alcanza solo las notificaciones sin leer de la cuenta autenticada. Responde `{ "actualizadas" }` con la cantidad modificada (`0` si no había pendientes) |
 
 - Una ruta inexistente responde `404`, un JSON mal formado `400` y un cuerpo demasiado grande `413`.
-- Las rutas privadas usan el mismo access token que Django, en `Authorization: Bearer <access>`. Sin token responde `401` con "Debés iniciar sesión para acceder a este recurso."; con un token inválido, vencido o que no sea de acceso (por ejemplo, un refresh), `401` con "El token es inválido o expiró.", los mismos mensajes que la API principal.
-- Las rutas del panel admiten solo roles de complejo (`DUENO_COMPLEJO`, `OPERADOR_COMPLEJO`) o `SUPERADMIN`; otro rol, o una cuenta con el rol desactivado, recibe `403` con "No tenés permiso para realizar esta acción.".
+- Las rutas privadas usan el mismo access token que Django, en `Authorization: Bearer <access>`. Sin token responde `401` con "Debés iniciar sesión para acceder a este recurso.". Con un token inválido, vencido o que no sea de acceso (por ejemplo, un refresh), `401` con "El token es inválido o expiró.", los mismos mensajes que la API principal.
+- Las rutas del panel admiten solo roles de complejo (`DUENO_COMPLEJO`, `OPERADOR_COMPLEJO`) o `SUPERADMIN`. Otro rol, o una cuenta con el rol desactivado, recibe `403` con "No tenés permiso para realizar esta acción.".
 - `POST /api/actividad`:
-  - **Usuario:** si el pedido trae un access token válido, el evento se asocia a esa cuenta; sin token, o con uno inválido o vencido, se registra como anónimo. El usuario sale siempre del token: un `usuario_id` en el cuerpo se ignora.
-  - **Tipos:** no acepta "reserva realizada" (`3`); ese evento lo emite la API principal al confirmar una reserva.
+  - **Usuario:** si el pedido trae un access token válido, el evento se asocia a esa cuenta. Sin token, o con uno inválido o vencido, se registra como anónimo. El usuario sale siempre del token: un `usuario_id` en el cuerpo se ignora.
+  - **Tipos:** no acepta "reserva realizada" (`3`). Ese evento lo emite la API principal al confirmar una reserva.
   - **`metadata`:** opcional, un objeto de hasta 2 KB, sin claves que empiecen con `$` ni contengan `.`.
   - **Errores:** `404` si el complejo no existe o no está habilitado. Tiene su propio límite de solicitudes por IP, más estricto que el general.
 - **Listas:** paginadas de a 20, con la misma forma que la API principal: `{ "count", "next", "previous", "results" }`, con `?page=` y `?limit=` (hasta 50). `next` y `previous` son rutas relativas a este servicio. Una página posterior a la última responde `404` con "Página inválida.".
-- **Panel del complejo:** roles de complejo o `SUPERADMIN`, con acceso al complejo confirmado por la API principal; un complejo ajeno responde `404`. Ninguna de estas respuestas incluye el usuario que generó un evento.
-- **Filtros de las bandejas:** `categoria`, `prioridad` y `estado` se pueden combinar entre sí y con `page` y `limit`; los enlaces `next` y `previous` los conservan. Un valor fuera de la lista, no numérico o repetido responde `400` con el detalle del campo. El listado de actividad no admite estos filtros. En la bandeja propia, `complejo_id` (entero positivo, un solo valor) se combina con los demás y también se conserva en los enlaces.
+- **Panel del complejo:** roles de complejo o `SUPERADMIN`, con acceso al complejo confirmado por la API principal. Un complejo ajeno responde `404`. Ninguna de estas respuestas incluye el usuario que generó un evento.
+- **Filtros de las bandejas:** `categoria`, `prioridad` y `estado` se pueden combinar entre sí y con `page` y `limit`. Los enlaces `next` y `previous` los conservan. Un valor fuera de la lista, no numérico o repetido responde `400` con el detalle del campo. El listado de actividad no admite estos filtros. En la bandeja propia, `complejo_id` (entero positivo, un solo valor) se combina con los demás y también se conserva en los enlaces.
 
 | Campo | Código | Significado |
 |---|---|---|
@@ -540,9 +540,9 @@ Servicio de actividad y notificaciones, con su propia URL base. Su documentació
 | `estado` | `1` | No leída |
 | | `2` | Leída |
 
-- **Bandeja propia:** la cuenta sale siempre del token; `usuario_id` u otros parámetros no permiten leer las de otra cuenta. Funciona también con el rol desactivado. Es la única bandeja de cada persona: ahí llegan los avisos que le corresponden por su rol, su vínculo con un complejo y sus permisos. Los mensajes nombran al complejo y no incluyen datos personales (emails ni teléfonos).
+- **Bandeja propia:** la cuenta sale siempre del token. `usuario_id` u otros parámetros no permiten leer las de otra cuenta. Funciona también con el rol desactivado. Es la única bandeja de cada persona: ahí llegan los avisos que le corresponden por su rol, su vínculo con un complejo y sus permisos. Los mensajes nombran al complejo y no incluyen datos personales (emails ni teléfonos).
 - **Avisos del sistema:** la API principal genera avisos sin que el cliente intervenga, siempre dirigidos a cuentas concretas:
-  - **Jugador titular de una reserva:** reserva registrada (pendiente de seña), confirmada, señada, pagada, completada o ausente; cancelación propia procesada; cancelación o reapertura por el complejo (con el estado en que quedó); cambio de horario o excepción que afecta una reserva futura; y un recordatorio del turno cuando empieza dentro de las próximas 24 horas, una sola vez por reserva.
+  - **Jugador titular de una reserva:** reserva registrada (pendiente de seña), confirmada, señada, pagada, completada o ausente. También la cancelación propia procesada, la cancelación o reapertura por el complejo (con el estado en que quedó), el cambio de horario o la excepción que afecta una reserva futura, y un recordatorio del turno cuando empieza dentro de las próximas 24 horas, una sola vez por reserva.
   - **Dueño y operadores de un complejo:** lo operativo (reserva web o manual nueva, cancelaciones, cambios de estado, reaperturas, fechas de turnos fijos en espera, altas y bajas de excepciones y conflictos de horarios), con el evento `tipo_evento: 3` resuelto en las reservas web. Cada integrante lo recibe si su rol tiene el permiso correspondiente, salvo quien realizó la acción. Además, cada hecho queda en el registro del complejo (sin excepciones y con el id de quien lo hizo), que consultan los tres roles de complejo.
   - **Solo el dueño:** lo comercial y de titularidad (seña retenida por la baja de una cuenta, alta y baja de operadores, configuración y precios, y estado del contrato).
   - **Superadministradores:** altas y cambios de estado de contratos, bajas y cambios de rol o estado de cuentas, alertas de seguridad por exceso de intentos y reportes periódicos del estado del servidor.
@@ -562,7 +562,7 @@ Servicio de actividad y notificaciones, con su propia URL base. Su documentació
 }
 ```
 
-- **Clima:** solo para complejos publicados; otro id responde `404` con "No se encontró el complejo.". Las fechas están en hora de Argentina, la temperatura en °C, el viento en km/h y la lluvia en mm; `probabilidad_lluvia` (%) puede ser `null` si el proveedor no la tiene. Se guarda 15 minutos por complejo, el intervalo en que el proveedor actualiza el clima actual. Los datos son de Open-Meteo, con licencia CC BY 4.0: la vista que los muestra debe citar la fuente que viaja en `fuente`.
+- **Clima:** solo para complejos publicados. Otro id responde `404` con "No se encontró el complejo.". Las fechas están en hora de Argentina, la temperatura en °C, el viento en km/h y la lluvia en mm. `probabilidad_lluvia` (%) puede ser `null` si el proveedor no la tiene. Se guarda 15 minutos por complejo, el intervalo en que el proveedor actualiza el clima actual. Los datos son de Open-Meteo, con licencia CC BY 4.0: la vista que los muestra debe citar la fuente que viaja en `fuente`.
 
 ```json
 {
@@ -588,18 +588,18 @@ Servicio de actividad y notificaciones, con su propia URL base. Su documentació
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
-| `GET /api/contratos/` | Superadmin | Contratos; filtros `estado_contrato` (`0` baja, `1` pendiente, `2` activo, `3` suspendido), `estado_propietario`, `propietario`, `search` |
+| `GET /api/contratos/` | Superadmin | Contratos. Filtros `estado_contrato` (`0` baja, `1` pendiente, `2` activo, `3` suspendido), `estado_propietario`, `propietario`, `search` |
 | `GET /api/contratos/<id>/` | Superadmin | Detalle |
 | `POST /api/contratos/` | Superadmin | Alta de complejo: `propietario`, `nombre`, `direccion`, `latitud`, `longitud` y opcionales `telefono_contacto`, `horas_limite_cancelacion`, `info_sena`, `estado_contrato` (`1` o `2`) |
-| `PATCH /api/contratos/<id>/` | Superadmin | `{ "estado_contrato" }`; con `0` o `3` el complejo deja de publicarse |
-| `GET /api/usuarios/` | Superadmin | Cuentas; filtros `rol`, `estado`, `search` |
+| `PATCH /api/contratos/<id>/` | Superadmin | `{ "estado_contrato" }`. Con `0` o `3` el complejo deja de publicarse |
+| `GET /api/usuarios/` | Superadmin | Cuentas. Filtros `rol`, `estado`, `search` |
 | `GET /api/usuarios/<id>/` | Superadmin | Detalle |
 | `PATCH /api/usuarios/<id>/` | Superadmin | `nombre_completo`, `telefono`, `rol`, `complejo_operado`, `estado` |
 | `GET /api/auditoria/` | Superadmin | Registro de eventos de seguridad, filtrable por tipo, usuario, complejo y rango de fechas. Entre los tipos: `20` solicitud de código de recuperación, `21` código bloqueado por intentos fallidos, `22` contraseña restablecida con código `23` cambio de contraseña desde la cuenta y `24` cambio de preferencias de notificaciones |
 
 ### Catálogos del sistema
 
-Administración de deportes, servicios y roles. Es la vista administrativa de los catálogos: a diferencia de `GET /api/deportes/` y `GET /api/servicios/`, que solo publican los registros activos, estas rutas incluyen las bajas y la cantidad de usos vigentes de cada ítem. Las listas son completas, sin paginar (catálogos chicos y acotados); las consultas de usos sí paginan.
+Administración de deportes, servicios y roles. Es la vista administrativa de los catálogos: a diferencia de `GET /api/deportes/` y `GET /api/servicios/`, que solo publican los registros activos, estas rutas incluyen las bajas y la cantidad de usos vigentes de cada ítem. Las listas son completas, sin paginar (catálogos chicos y acotados). Las consultas de usos sí paginan.
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
@@ -607,20 +607,20 @@ Administración de deportes, servicios y roles. Es la vista administrativa de lo
 | `GET /api/sistema/deportes/<id>/` | Superadmin | Detalle de un deporte |
 | `POST /api/sistema/deportes/` | Superadmin | Alta: `{ "nombre" }` (de 2 a 60 caracteres, único sin distinguir mayúsculas) |
 | `PATCH /api/sistema/deportes/<id>/` | Superadmin | `nombre` y/o `estado: 1` (reactivar un deporte de baja) |
-| `DELETE /api/sistema/deportes/<id>/` | Superadmin | Baja lógica; `204`. Se rechaza con `400` si alguna cancha vigente lo usa |
+| `DELETE /api/sistema/deportes/<id>/` | Superadmin | Baja lógica. `204`. Se rechaza con `400` si alguna cancha vigente lo usa |
 | `GET /api/sistema/deportes/<id>/usos/` | Superadmin | Complejos que usan el deporte, paginado: `complejo_id`, `complejo_nombre` y sus `canchas` (`id`, `nombre`) de ese deporte |
 | `GET /api/sistema/servicios/` | Superadmin | Servicios con su estado y `usos` (complejos vigentes que lo ofrecen), incluidos los dados de baja |
 | `GET /api/sistema/servicios/<id>/` | Superadmin | Detalle de un servicio |
 | `POST /api/sistema/servicios/` | Superadmin | Alta: `{ "nombre" }` (de 2 a 80 caracteres, único) |
 | `PATCH /api/sistema/servicios/<id>/` | Superadmin | `nombre` y/o `estado: 1` (reactivar) |
-| `DELETE /api/sistema/servicios/<id>/` | Superadmin | Baja lógica; `204`. Se rechaza con `400` si algún complejo vigente lo ofrece |
+| `DELETE /api/sistema/servicios/<id>/` | Superadmin | Baja lógica. `204`. Se rechaza con `400` si algún complejo vigente lo ofrece |
 | `GET /api/sistema/servicios/<id>/usos/` | Superadmin | Complejos que ofrecen el servicio, paginado: `complejo_id` y `complejo_nombre` |
 | `GET /api/sistema/permisos/` | Superadmin | Catálogo de permisos para armar un rol: `id`, `codigo`, `nombre`, `modulo` y `asignable` (`false` si es exclusivo de la plataforma). Sin paginar |
 | `GET /api/sistema/roles/` | Superadmin | Roles con `estado`, `es_base`, `usos` (cuentas vigentes con el rol) y `permisos` asignados, incluidos los dados de baja |
 | `GET /api/sistema/roles/<id>/` | Superadmin | Detalle de un rol |
 | `POST /api/sistema/roles/` | Superadmin | Alta: `nombre` (de 2 a 50 caracteres), `descripcion` opcional (hasta 150) y `permisos` opcional (lista de ids del catálogo, sin repetir) |
 | `PATCH /api/sistema/roles/<id>/` | Superadmin | `nombre`, `descripcion`, `permisos` (reemplaza la lista completa) y/o `estado: 1` (reactivar) |
-| `DELETE /api/sistema/roles/<id>/` | Superadmin | Baja lógica; `204`. Se rechaza con `400` si hay cuentas vigentes con el rol |
+| `DELETE /api/sistema/roles/<id>/` | Superadmin | Baja lógica. `204`. Se rechaza con `400` si hay cuentas vigentes con el rol |
 | `GET /api/sistema/roles/<id>/usos/` | Superadmin | Cuentas vigentes con el rol, paginado: `id`, `nombre`, `email`, `estado` y `estado_nombre` |
 
 - Las respuestas de deportes y servicios traen `id`, `nombre`, `estado`, `estado_nombre`, `usos`, `fecha_creacion` y `fecha_modificacion`. Las de roles suman `descripcion`, `es_base` y `permisos` (`id`, `codigo`, `nombre`, `modulo`).
@@ -676,6 +676,6 @@ Cuerpo del `PUT`:
 - `preferencias` es una lista no vacía de pares, sin repetir y solo de combinaciones válidas. `habilitada` es obligatorio y booleano.
 - Un par que ya tiene el valor pedido no cambia nada. Si ningún par cambia de verdad, responde `200` sin registrar un evento de auditoría.
 - La actualización es atómica: si algún par es inválido no se guarda ninguno. El cambio rige de inmediato para los avisos nuevos.
-- Respuestas de error: `400` por un tipo o rol inexistente, una combinación que no aplica, un par repetido, `habilitada` ausente o no booleano, o una lista vacía; `401` sin sesión; `403` sin rol de superadmin; `409` si otra persona modificó las mismas preferencias al mismo tiempo (se reintenta).
+- Respuestas de error: `400` por un tipo o rol inexistente, una combinación que no aplica, un par repetido, `habilitada` ausente o no booleano, o una lista vacía. `401` sin sesión. `403` sin rol de superadmin. `409` si otra persona modificó las mismas preferencias al mismo tiempo (se reintenta).
 - Un cambio real queda registrado en la auditoría con el tipo "Cambio de preferencias de notificaciones" (tipo de evento `24`). El detalle lista los pares `categoría:rol` que se activaron y los que se desactivaron, sin datos personales.
 - Las entradas del registro de actividad de cada complejo se siguen generando aunque una categoría se desactive para el personal.
