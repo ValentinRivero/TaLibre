@@ -1300,7 +1300,7 @@ const es = {
   },
   contratos: {
     titulo: 'Contratos',
-    descripcion: 'Complejos con su contrato y propietario. Un contrato suspendido o dado de baja oculta el complejo del catálogo público.',
+    descripcion: 'Complejos con su contrato y propietario. Un contrato suspendido o dado de baja oculta el complejo del catálogo público. Si se da de baja, sale además del panel del dueño y de sus operadores hasta que cambie de estado.',
     nuevo: 'Nuevo complejo',
     altaTitulo: 'Alta de un complejo con su contrato',
     buscarPropietario: 'Buscar al propietario',

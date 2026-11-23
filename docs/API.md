@@ -221,8 +221,8 @@ El listado y el detalle informan `porcentaje_sena` (entero de `0` a `100`, donde
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
-| `GET /api/complejos/administrados/` | Operador | Complejos que el usuario puede administrar |
-| `GET /api/complejos/<id>/acceso/` | Operador | Confirma que el usuario administra el complejo: `{ "complejo": id }`. Un complejo ajeno, inexistente o dado de baja responde `404` |
+| `GET /api/complejos/administrados/` | Operador | Complejos que el usuario puede administrar. Para el dueño y el operador no incluye los de contrato dado de baja |
+| `GET /api/complejos/<id>/acceso/` | Operador | Confirma que el usuario administra el complejo: `{ "complejo": id }`. Un complejo ajeno, inexistente o dado de baja responde `404`, y también uno con el contrato dado de baja para su dueño y sus operadores |
 | `PATCH /api/complejos/<id>/` | Dueño | `nombre`, `direccion`, `latitud`, `longitud`, `telefono_contacto`, `horas_limite_cancelacion`, `info_sena`, `porcentaje_sena`, `alias_transferencia`, `titular_transferencia`, `cbu_cvu_transferencia` |
 | `PUT /api/complejos/<id>/servicios/` | Dueño | `{ "servicios": [ids] }`: deja activos exactamente esos servicios |
 | `GET /api/complejos/<id>/operadores/` | Dueño | Operadores del complejo |
@@ -370,7 +370,7 @@ Si el cambio deja reservas por jugar (pendientes, confirmadas o señadas) o turn
 - `criterio` indica qué fecha de la reserva se compara con el rango: `fecha_turno` (por defecto, el día que se juega), `fecha_creacion` (el día que se registró) o `fecha_modificacion` (el último cambio, por ejemplo una cancelación).
 - El rango incluye ambos extremos, `fecha_hasta` no puede ser anterior a `fecha_desde` y abarca como máximo 366 días. Si no, responde `400`.
 - `cancha_id` debe ser una cancha del complejo, incluidas las que están en mantenimiento o dadas de baja, que conservan su historial. Si no, responde `400`. `deporte_id` debe ser un deporte existente. Ambos filtros se combinan.
-- Se consulta también con el contrato pendiente o suspendido. Un complejo dado de baja o ajeno responde `404`. El operador no accede a los reportes (`403`).
+- Se consulta también con el contrato pendiente o suspendido. Un complejo dado de baja, ajeno o con el contrato dado de baja responde `404` al dueño. El operador no accede a los reportes (`403`).
 - Con `fecha_creacion` y `fecha_modificacion`, los días se cuentan en hora de Argentina: una reserva registrada el 30/11 a las 23:30 entra en noviembre.
 - La respuesta incluye `filtros` con los valores aplicados, ya normalizados, y las métricas del rango:
 

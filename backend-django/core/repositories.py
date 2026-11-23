@@ -445,28 +445,41 @@ class ComplejoRepository:
         return complejo
 
     @staticmethod
+    def _con_contrato_vigente():
+        """Sin baja lógica y con el contrato pendiente, activo o suspendido."""
+        return ComplejoRepository._vigentes().exclude(estado_contrato=EstadoContrato.BAJA)
+
+    @staticmethod
     def existe(complejo_id):
         return ComplejoRepository._vigentes().filter(id=complejo_id).exists()
 
     @staticmethod
-    def es_propietario(complejo_id, usuario_id):
-        return ComplejoRepository._vigentes().filter(id=complejo_id, propietario_id=usuario_id).exists()
+    def tiene_contrato_vigente(complejo_id):
+        return ComplejoRepository._con_contrato_vigente().filter(id=complejo_id).exists()
 
     @staticmethod
-    def tiene_contratos_vigentes(propietario_id):
+    def es_propietario_con_contrato_vigente(complejo_id, usuario_id):
         return (
-            ComplejoRepository._vigentes()
-            .filter(propietario_id=propietario_id)
-            .exclude(estado_contrato=EstadoContrato.BAJA)
-            .exists()
+            ComplejoRepository._con_contrato_vigente().filter(id=complejo_id, propietario_id=usuario_id).exists()
         )
 
     @staticmethod
+    def tiene_contratos_vigentes(propietario_id):
+        return ComplejoRepository._con_contrato_vigente().filter(propietario_id=propietario_id).exists()
+
+    @staticmethod
     def restringir_queryset(queryset, campo_complejo, condiciones):
-        """Filtra un queryset por condiciones sobre su complejo; `campo_complejo` vacío indica que el modelo es Complejo."""
+        """
+        Filtra un queryset por condiciones sobre su complejo y deja afuera los complejos dados de baja y los de
+        contrato dado de baja. `campo_complejo` vacío indica que el modelo es Complejo.
+        """
         prefijo = f'{campo_complejo}__' if campo_complejo else ''
         filtro = {f'{prefijo}{campo}': valor for campo, valor in condiciones.items()}
-        return queryset.filter(**filtro).exclude(**{f'{prefijo}estado': EstadoRegistro.BAJA})
+        return (
+            queryset.filter(**filtro)
+            .exclude(**{f'{prefijo}estado': EstadoRegistro.BAJA})
+            .exclude(**{f'{prefijo}estado_contrato': EstadoContrato.BAJA})
+        )
 
 
 class CatalogoRepository:

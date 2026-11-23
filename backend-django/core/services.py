@@ -160,7 +160,11 @@ class RbacService:
 
 
 class AccesoComplejoService:
-    """Único punto que decide qué complejos administra un usuario."""
+    """
+    Único punto que decide qué complejos administra un usuario. El superadministrador ve todos los que no tienen
+    baja lógica. El dueño y sus operadores pierden el acceso a un complejo cuando su contrato se da de baja, sin
+    desvincularse, y lo recuperan si el contrato vuelve a otro estado. Con el contrato suspendido lo conservan.
+    """
 
     @staticmethod
     def _rol(usuario):
@@ -179,9 +183,12 @@ class AccesoComplejoService:
         if rol == ROL_SUPERADMIN:
             return ComplejoRepository.existe(complejo_id)
         if rol == ROL_DUENO:
-            return ComplejoRepository.es_propietario(complejo_id, usuario.pk)
+            return ComplejoRepository.es_propietario_con_contrato_vigente(complejo_id, usuario.pk)
         if rol == ROL_OPERADOR:
-            return usuario.complejo_operado_id == complejo_id and ComplejoRepository.existe(complejo_id)
+            return (
+                usuario.complejo_operado_id == complejo_id
+                and ComplejoRepository.tiene_contrato_vigente(complejo_id)
+            )
         return False
 
     @staticmethod
@@ -905,7 +912,9 @@ class ContratoService:
     def cambiar_estado(complejo_id, estado_nuevo, actor, ip_origen):
         """
         El catálogo público solo muestra contratos activos: pasar a Suspendido o Baja oculta el complejo al
-        instante sin tocar sus canchas, reservas ni auditoría, y el titular conserva el acceso a su historial.
+        instante sin tocar sus canchas, reservas ni auditoría. Con Suspendido el titular y sus operadores conservan
+        el panel y el historial. Con Baja el complejo sale también de su panel (ver AccesoComplejoService) y vuelve
+        a aparecer cuando el contrato pasa a otro estado.
         """
         with transaction.atomic():
             complejo = ComplejoRepository.bloquear(complejo_id)

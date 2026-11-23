@@ -15,6 +15,10 @@ from core.models import (
 URL = '/api/contratos/'
 
 
+def _ids_administrados(cliente):
+    return [item['id'] for item in cliente.get('/api/complejos/administrados/').json()['results']]
+
+
 def _datos_alta(propietario, **cambios):
     datos = {
         'propietario': propietario.id,
@@ -230,8 +234,39 @@ class TestCambioDeEstadoDeContrato:
         assert complejo.estado == EstadoRegistro.ACTIVO
         assert Cancha.objects.get(id=cancha.id).estado == EstadoCancha.ACTIVA
         assert cliente_de(superadmin).get(URL, {'estado_contrato': 0}).json()['count'] == 1
-        administrados = cliente_de(dueno).get('/api/complejos/administrados/').json()['results']
-        assert [item['id'] for item in administrados] == [complejo.id]
+
+    def test_la_baja_del_contrato_lo_saca_del_panel_del_dueno_y_de_sus_operadores(
+        self, superadmin, dueno, operador, complejo, crear_complejo, cliente_de,
+    ):
+        otro = crear_complejo(dueno, 'Otro Complejo')
+
+        self._cambiar(cliente_de(superadmin), complejo, EstadoContrato.BAJA)
+
+        assert _ids_administrados(cliente_de(dueno)) == [otro.id]
+        assert _ids_administrados(cliente_de(operador)) == []
+        assert complejo.id in _ids_administrados(cliente_de(superadmin))
+        operador.refresh_from_db()
+        assert operador.complejo_operado_id == complejo.id
+
+    def test_con_el_contrato_suspendido_el_personal_conserva_el_panel(
+        self, superadmin, dueno, operador, complejo, cliente_de,
+    ):
+        self._cambiar(cliente_de(superadmin), complejo, EstadoContrato.SUSPENDIDO)
+
+        assert _ids_administrados(cliente_de(dueno)) == [complejo.id]
+        assert _ids_administrados(cliente_de(operador)) == [complejo.id]
+
+    @pytest.mark.parametrize('estado', [EstadoContrato.PENDIENTE, EstadoContrato.ACTIVO])
+    def test_volver_a_pendiente_o_activo_lo_devuelve_al_panel(
+        self, superadmin, dueno, operador, complejo, cliente_de, estado,
+    ):
+        self._cambiar(cliente_de(superadmin), complejo, EstadoContrato.BAJA)
+
+        respuesta = self._cambiar(cliente_de(superadmin), complejo, estado)
+
+        assert respuesta.status_code == status.HTTP_200_OK
+        assert _ids_administrados(cliente_de(dueno)) == [complejo.id]
+        assert _ids_administrados(cliente_de(operador)) == [complejo.id]
 
     def test_reactivar_vuelve_a_publicar(self, superadmin, dueno, crear_complejo, cliente, cliente_de):
         suspendido = crear_complejo(dueno, 'Suspendido', estado_contrato=EstadoContrato.SUSPENDIDO)

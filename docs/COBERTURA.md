@@ -6,7 +6,7 @@ Reporte de las pruebas automatizadas de los tres proyectos y de la prueba de pun
 
 | Suite | Herramienta | Pruebas | Resultado | Cobertura |
 |---|---|---|---|---|
-| backend-django | pytest, pytest-django y pytest-cov | 2695 en 49 archivos | 2690 pasadas y 5 de concurrencia que corren en su propio job | 99 % de sentencias en `core` (98,97 % sin contar los archivos de prueba) |
+| backend-django | pytest, pytest-django y pytest-cov | 2705 en 49 archivos | 2700 pasadas y 5 de concurrencia que corren en su propio job | 99 % de sentencias en `core` (98,97 % sin contar los archivos de prueba) |
 | backend-django, concurrencia | pytest sobre PostgreSQL | 5 | Pasan en el job `django-concurrencia` | Complementa la suite general |
 | backend-node | Jest y Supertest | 559 en 23 archivos | Todas pasan | 99,85 % de sentencias, 99,39 % de ramas, 100 % de funciones y 99,82 % de líneas |
 | frontend | Vitest | 1202 en 55 archivos | Todas pasan | Funciones puras, sin medición de cobertura |
@@ -44,7 +44,7 @@ SEED_PASSWORD_DEMO=DemoLocal2026 python .github/scripts/prueba_humo.py --url htt
 | Módulo | Sentencias | Sin cubrir | Cobertura | Qué contiene |
 |---|---|---|---|---|
 | `core/services.py` | 2252 | 15 | 99 % | Reglas de negocio: disponibilidad, motor de reservas, conflictos, baja de cuenta, reportes, avisos y difusión |
-| `core/repositories.py` | 649 | 2 | 99 % | Consultas al ORM y agregaciones de reportes |
+| `core/repositories.py` | 655 | 2 | 99 % | Consultas al ORM y agregaciones de reportes |
 | `core/serializers.py` | 632 | 1 | 99 % | Validación y sanitización de entradas |
 | `core/serializers_auth.py` | 105 | 0 | 100 % | Registro, sesión y contraseñas |
 | `core/views.py` | 621 | 1 | 99 % | Vistas de la API |
@@ -54,7 +54,7 @@ SEED_PASSWORD_DEMO=DemoLocal2026 python .github/scripts/prueba_humo.py --url htt
 | `core/permissions.py` y `core/throttles.py` | 62 | 1 | 98 % | Permisos y limitadores |
 | `core/node_client.py` y `core/email_service.py` | 138 | 3 | 98 % | Integración con Node y correo |
 | `core/management/commands/` | 201 | 5 | 98 % | Seed y tareas programadas |
-| **Total sin archivos de prueba** | **5748** | **59** | **98,97 %** | |
+| **Total sin archivos de prueba** | **5754** | **59** | **98,97 %** | |
 
 ### 3.2. backend-node
 
