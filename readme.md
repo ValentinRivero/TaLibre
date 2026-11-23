@@ -151,7 +151,7 @@ Todas las dependencias tienen licencias abiertas permisivas (MIT, BSD, ISC, Apac
 | Recurso | Licencia | Uso |
 |---|---|---|
 | [Bootstrap](https://getbootstrap.com/) y [React Bootstrap](https://react-bootstrap.github.io/) | MIT | Grilla de diseño y componentes accesibles, tematizados con variables propias |
-| [Leaflet](https://leafletjs.com/) | BSD-2-Clause | Mapa del catálogo, con un envoltorio propio de React. No se usa `react-leaflet`, cuya licencia no es de código abierto |
+| [Leaflet](https://leafletjs.com/) | BSD-2-Clause | Mapa del catálogo, con un envoltorio propio de React. |
 | [Barlow Semi Condensed](https://github.com/jpt/barlow) | SIL Open Font License 1.1 | Tipografía de títulos, autoalojada en `frontend/public/fonts/` junto a su `OFL.txt` |
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) | ODbL (datos) y CC BY-SA 2.0 (cartografía) | Teselas y datos de las calles del mapa, servidos por la OpenStreetMap Foundation según su política de uso, con la atribución `© OpenStreetMap contributors` visible en el mapa |
 | [Open-Meteo](https://open-meteo.com/) | CC BY 4.0 | Pronóstico del clima, con la atribución a Open-Meteo.com junto a cada bloque de clima |
