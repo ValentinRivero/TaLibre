@@ -169,7 +169,7 @@ Son obra del equipo, creados con asistencia de inteligencia artificial (ver la d
 
 - Cada tema se desarrolla en su propia rama (`feat/<tema>`, `fix/<tema>` o `docs/<tema>`) que sale de `main` actualizada.
 - Se integra a `main` por pull request, con el CI en verde y revisión manual de ser posible.
-- Cada integración a `main` se despliega sola y cada versión entregada lleva su etiqueta (`vX.Y.Z` - EJ: `v0.7.2`).
+- Cada integración a `main` se despliega sola y cada versión entregada lleva su etiqueta (`vX.Y.Z`, por ejemplo `v0.7.9`).
 - Las reglas de arquitectura, estilo, seguridad y datos personales se escribieron antes del código y cada etapa se implementó contra ellas, con sus pruebas en el mismo cambio.
 
 ---
