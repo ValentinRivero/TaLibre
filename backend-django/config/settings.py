@@ -280,7 +280,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Versión vigente de la política de privacidad publicada en el frontend; cambiarla obliga a aceptarla de nuevo.
-POLITICA_PRIVACIDAD_VERSION = '1.2'
+POLITICA_PRIVACIDAD_VERSION = '1.3'
 
 CORS_ALLOWED_ORIGINS = _env_lista(
     'CORS_ALLOWED_ORIGINS',

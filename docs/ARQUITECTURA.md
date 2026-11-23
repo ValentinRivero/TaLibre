@@ -33,6 +33,8 @@ TaLibre es una plataforma web para reservar turnos en complejos deportivos de Go
 
 Además de los cuatro roles base, el superadministrador puede crear roles personalizados con un subconjunto de los permisos de complejo.
 
+Un dueño puede ser titular de varios complejos y elige cuál administra desde su panel. Un operador, en cambio, opera un único complejo por cuenta (`usuarios.complejo_operado`). Así el alcance de cada operador se resuelve con una sola clave y el dueño que lo vincula sabe que no trabaja para otro complejo. Quien atiende dos complejos usa una cuenta para cada uno.
+
 ### 1.2. Alcance
 
 Dentro del alcance: catálogo público con filtros y mapa, ficha del complejo con clima, grilla en tiempo real, reservas web y manuales con control de solapamiento, turnos fijos, excepciones horarias, señas por transferencia con su conciliación, cancelación con margen horario, reportes por rango de fechas, notificaciones por rol, recuperación de contraseña por código, consentimiento y baja de cuenta conforme a la Ley 25.326, documentación interactiva de ambas APIs y aplicación instalable.
@@ -53,11 +55,11 @@ flowchart LR
     pg[("PostgreSQL<br/>16 tablas")]
     mongo[("MongoDB<br/>eventos y notificaciones")]
     meteo["Open-Meteo<br/>pronóstico"]
-    esri["Esri<br/>teselas del mapa"]
+    osm["OpenStreetMap<br/>teselas del mapa"]
     resend["Resend<br/>correo transaccional"]
 
     nav -- "HTTPS y WSS" --> nginx
-    nav -- "teselas por HTTPS" --> esri
+    nav -- "teselas por HTTPS" --> osm
     nginx -- "/api, /graphql, /ws" --> django
     nginx -- "/api/actividad, /api/externa, /api/reportes-aux, /api/docs-node" --> node
     django --> pg
@@ -72,7 +74,7 @@ flowchart LR
 - **Un solo origen.** El navegador habla con un único dominio. nginx sirve el frontend compilado y reparte las rutas entre los backends, así que no hace falta CORS entre el frontend y las APIs en producción y la cookie de sesión puede ser `SameSite=Strict`.
 - **Rutas internas cerradas.** Las rutas `/api/interno` de Node solo las usa Django por la red privada. nginx responde 404 a cualquier pedido externo a ellas, y además exigen una clave compartida.
 - **Cada backend con su base.** Django es el único que lee y escribe PostgreSQL. Node es el único que lee y escribe MongoDB. Cuando uno necesita un dato del otro lo pide por HTTP ([ADR-01](#adr-01-dos-backends-y-persistencia-políglota)).
-- **El mapa no pasa por los backends.** El navegador descarga las teselas directamente del proveedor, por HTTPS y sin clave de API ([ADR-08](#adr-08-leaflet-directo-sin-react-leaflet-y-teselas-sin-clave)).
+- **El mapa no pasa por los backends.** El navegador descarga las teselas de calles directamente de los servidores de OpenStreetMap, por HTTPS y sin clave de API ([ADR-08](#adr-08-leaflet-directo-sin-react-leaflet-y-teselas-sin-clave)).
 
 ## 3. Tecnologías y por qué
 
@@ -505,10 +507,10 @@ Cada decisión sigue el formato contexto, decisión, alternativas descartadas y 
 
 ### ADR-08. Leaflet directo sin react-leaflet y teselas sin clave
 
-- **Contexto:** el catálogo necesita un mapa interactivo, con licencias abiertas y sin secretos en el navegador.
-- **Decisión:** Leaflet (BSD-2-Clause) con un envoltorio propio de React, y teselas de calles de un proveedor que no exige clave de API, con sus atribuciones visibles.
-- **Alternativas descartadas:** `react-leaflet`, cuya licencia Hippocratic no es una licencia de código abierto aprobada. Proveedores de teselas que exigen clave, que quedaría expuesta en el navegador. Mapas comerciales con facturación por uso.
-- **Consecuencias:** un envoltorio pequeño que mantener. El proveedor de teselas recibe la IP de quien abre el mapa, y por eso figura como destinatario en la política de privacidad.
+- **Contexto:** el catálogo necesita un mapa interactivo, con licencias abiertas, sin secretos en el navegador y con las calles de Goya bien ubicadas y nombradas, también en los barrios nuevos.
+- **Decisión:** Leaflet (BSD-2-Clause) con un envoltorio propio de React, y las teselas estándar de OpenStreetMap (`tile.openstreetmap.org`), que no exigen clave de API, con la atribución `© OpenStreetMap contributors` visible. Se cumple su política de uso: la URL exacta por HTTPS, el `Referer` del navegador (la política de referencia del sitio lo envía), la atribución en el mapa y ninguna descarga anticipada, porque el service worker no guarda teselas.
+- **Alternativas descartadas:** `react-leaflet`, cuya licencia Hippocratic no es una licencia de código abierto aprobada. Proveedores de teselas que exigen clave, que quedaría expuesta en el navegador. Mapas comerciales con facturación por uso o con cartografía desactualizada en los barrios nuevos de la ciudad. Teselas vectoriales dibujadas en el navegador, que permitirían elegir qué rótulos mostrar (por ejemplo, ocultar los números de manzana), pero suman una dependencia y obligan a rehacer la capa del mapa.
+- **Consecuencias:** un envoltorio pequeño que mantener. La OpenStreetMap Foundation recibe la IP de quien abre el mapa, y por eso figura como destinataria en la política de privacidad. El servicio no garantiza disponibilidad y puede limitar a quien abuse, lo que no afecta a un sitio de poco tráfico. Las teselas son imágenes ya dibujadas: el tema solo puede ajustar su color, no qué rótulos muestran.
 
 ### ADR-09. drf-spectacular para OpenAPI 3
 

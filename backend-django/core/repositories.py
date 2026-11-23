@@ -120,7 +120,11 @@ class UsuarioRepository:
 
     @staticmethod
     def listar():
-        return Usuario.objects.select_related('rol', 'complejo_operado').order_by('id')
+        return (
+            Usuario.objects.select_related('rol', 'complejo_operado')
+            .prefetch_related(ComplejoRepository.prefetch_propios_vigentes())
+            .order_by('id')
+        )
 
     @staticmethod
     def ids_activos_con_rol(nombre_rol):
@@ -326,6 +330,21 @@ class ComplejoRepository:
         return ComplejoRepository._vigentes().order_by('nombre', 'id')
 
     @staticmethod
+    def _propios_vigentes():
+        return ComplejoRepository.vigentes().only('id', 'nombre', 'propietario_id')
+
+    @staticmethod
+    def prefetch_propios_vigentes():
+        # Una sola consulta para todos los titulares de la página, sin importar cuántos complejos tenga cada uno.
+        return Prefetch(
+            'complejos_propios', queryset=ComplejoRepository._propios_vigentes(), to_attr='complejos_propios_vigentes',
+        )
+
+    @staticmethod
+    def propios_vigentes(usuario_id):
+        return list(ComplejoRepository._propios_vigentes().filter(propietario_id=usuario_id))
+
+    @staticmethod
     def contratos():
         return ComplejoRepository._vigentes().select_related('propietario').order_by('nombre', 'id')
 
@@ -426,28 +445,41 @@ class ComplejoRepository:
         return complejo
 
     @staticmethod
+    def _con_contrato_vigente():
+        """Sin baja lógica y con el contrato pendiente, activo o suspendido."""
+        return ComplejoRepository._vigentes().exclude(estado_contrato=EstadoContrato.BAJA)
+
+    @staticmethod
     def existe(complejo_id):
         return ComplejoRepository._vigentes().filter(id=complejo_id).exists()
 
     @staticmethod
-    def es_propietario(complejo_id, usuario_id):
-        return ComplejoRepository._vigentes().filter(id=complejo_id, propietario_id=usuario_id).exists()
+    def tiene_contrato_vigente(complejo_id):
+        return ComplejoRepository._con_contrato_vigente().filter(id=complejo_id).exists()
 
     @staticmethod
-    def tiene_contratos_vigentes(propietario_id):
+    def es_propietario_con_contrato_vigente(complejo_id, usuario_id):
         return (
-            ComplejoRepository._vigentes()
-            .filter(propietario_id=propietario_id)
-            .exclude(estado_contrato=EstadoContrato.BAJA)
-            .exists()
+            ComplejoRepository._con_contrato_vigente().filter(id=complejo_id, propietario_id=usuario_id).exists()
         )
 
     @staticmethod
+    def tiene_contratos_vigentes(propietario_id):
+        return ComplejoRepository._con_contrato_vigente().filter(propietario_id=propietario_id).exists()
+
+    @staticmethod
     def restringir_queryset(queryset, campo_complejo, condiciones):
-        """Filtra un queryset por condiciones sobre su complejo; `campo_complejo` vacío indica que el modelo es Complejo."""
+        """
+        Filtra un queryset por condiciones sobre su complejo y deja afuera los complejos dados de baja y los de
+        contrato dado de baja. `campo_complejo` vacío indica que el modelo es Complejo.
+        """
         prefijo = f'{campo_complejo}__' if campo_complejo else ''
         filtro = {f'{prefijo}{campo}': valor for campo, valor in condiciones.items()}
-        return queryset.filter(**filtro).exclude(**{f'{prefijo}estado': EstadoRegistro.BAJA})
+        return (
+            queryset.filter(**filtro)
+            .exclude(**{f'{prefijo}estado': EstadoRegistro.BAJA})
+            .exclude(**{f'{prefijo}estado_contrato': EstadoContrato.BAJA})
+        )
 
 
 class CatalogoRepository:

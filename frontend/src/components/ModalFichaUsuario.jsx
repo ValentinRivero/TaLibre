@@ -12,8 +12,9 @@ const OPCIONES_ESTADO = opcionesDe(ESTADO_USUARIO);
 
 /**
  * Ficha de una cuenta (presentación). Se abre en modo consulta, con todos los campos deshabilitados, y recién con
- * "Habilitar edición" se pueden modificar nombre, teléfono, rol, complejo operado (solo para operadores) y estado;
- * "Cancelar edición" vuelve a la consulta sin guardar. Las restricciones de negocio las valida el backend (`400`): el
+ * "Habilitar edición" se pueden modificar nombre, teléfono, rol, complejo operado (solo para operadores) y estado.
+ * "Cancelar edición" vuelve a la consulta sin guardar. Los complejos de un dueño se muestran sin edición: la titularidad
+ * se gestiona desde Contratos. Las restricciones de negocio las valida el backend (`400`): el
  * mensaje general se muestra arriba y el de un campo, bajo ese campo. `ficha` es lo que devuelve `useUsuarios`.
  */
 export default function ModalFichaUsuario({ ficha }) {
@@ -61,6 +62,15 @@ export default function ModalFichaUsuario({ ficha }) {
               {...campo('telefono')}
             />
             <CampoSelect id="usuario-rol" etiqueta={t('usuarios.rol')} opciones={OPCIONES_ROL} {...campo('rol')} />
+            {usuario.complejos_propios?.length > 0 && (
+              <div className="mb-3">
+                <p className="form-label mb-1">{t('usuarios.complejosPropios')}</p>
+                <ul className="mb-1 ps-3">
+                  {usuario.complejos_propios.map((complejo) => <li key={complejo.id}>{complejo.nombre}</li>)}
+                </ul>
+                <p className="form-text mb-0">{t('usuarios.ayudaComplejosPropios')}</p>
+              </div>
+            )}
             {valores.rol === ROL.OPERADOR && (
               <CampoSelect
                 id="usuario-complejo"

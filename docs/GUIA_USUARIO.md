@@ -169,7 +169,7 @@ El superadministrador tiene todo lo del dueño sobre cualquier complejo y la sec
 
 ![Lista de contratos de los complejos con su propietario y estado](capturas/09-contratos.png)
 
-**Contratos** lista los complejos con su propietario, el estado del contrato y la fecha de alta. Desde acá se da de alta un complejo nuevo, se entra a administrarlo y se cambia el estado del contrato. Un contrato **Suspendido** o dado de baja oculta el complejo del catálogo y de la grilla pública en el momento.
+**Contratos** lista los complejos con su propietario, el estado del contrato y la fecha de alta. Desde acá se da de alta un complejo nuevo, se entra a administrarlo y se cambia el estado del contrato. Un contrato **Suspendido** o dado de baja oculta el complejo del catálogo y de la grilla pública en el momento. Con el contrato suspendido el dueño y sus operadores siguen viendo el complejo en su panel. Con el contrato dado de baja deja de aparecerles hasta que el contrato pase a otro estado, por ejemplo de nuevo a **Pendiente** o **Activo**.
 
 ### 6.2. Usuarios, roles, catálogos y notificaciones
 

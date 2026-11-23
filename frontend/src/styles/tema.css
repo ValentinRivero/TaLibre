@@ -2233,7 +2233,7 @@ a {
   font-size: 0.95rem;
 }
 
-/* Las teselas de calles son ráster y no admiten otro estilo, así que se desaturan y se llevan a un verde muy suave (calles en gris claro, manzanas verdosas). */
+/* Las teselas de calles son ráster y no admiten otro estilo, así que se desaturan y se les corre apenas el tono para que acompañen la paleta del tema. En modo oscuro se invierten. */
 .mapa-contenedor .leaflet-tile-pane {
   filter: var(--mapa-filtro-teselas);
 }

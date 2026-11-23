@@ -56,14 +56,13 @@ export const PARAMETROS = Object.freeze({
     zoomAjusteMaximo: 16,
     margenAjustePx: 40,
     anchoPopupPx: 232,
-    // Teselas de calles, pedidas sin clave, con las atribuciones que exigen sus proveedores. `zoomNativoMaximo` es el
-    // último nivel con datos reales en Goya: más cerca se amplía ese nivel.
+    // Teselas de calles de OpenStreetMap, pedidas sin clave y con la URL exacta que exige su política de uso (sin
+    // subdominios). `zoomNativoMaximo` es el último nivel que sirve el proveedor: más cerca se amplía ese nivel.
     teselas: Object.freeze({
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       zoomNativoMaximo: 19,
     }),
     atribuciones: Object.freeze([
-      Object.freeze({ texto: 'Tiles © Esri', url: 'https://www.esri.com/', licencia: 'Esri World Street Map' }),
       Object.freeze({ texto: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright', licencia: 'ODbL' }),
     ]),
   }),
@@ -79,8 +78,8 @@ export const PARAMETROS = Object.freeze({
   // tienen una `url` https.
   pie: Object.freeze({
     redes: Object.freeze([
-      Object.freeze({ clave: 'instagram', icono: 'instagram', usuario: '@talibre.goya', url: 'https://www.instagram.com/' }),
-      Object.freeze({ clave: 'facebook', icono: 'facebook', usuario: '@talibre.goya', url: 'https://www.facebook.com/' }),
+      Object.freeze({ clave: 'instagram', icono: 'instagram', usuario: '@ta.libre', url: 'https://www.instagram.com/ta.libre' }),
+      Object.freeze({ clave: 'facebook', icono: 'facebook', usuario: '@TaLibre', url: 'https://www.facebook.com/profile.php?id=61596606311626' }),
       Object.freeze({ clave: 'twitter', icono: 'twitter', usuario: '@talibre_goya', url: 'https://x.com/' }),
     ]),
   }),
@@ -113,7 +112,7 @@ export const PARAMETROS = Object.freeze({
   }),
   // Espejo de POLITICA_PRIVACIDAD_VERSION de Django.
   politica: Object.freeze({
-    version: '1.2',
+    version: '1.3',
     vigenteDesde: '2026-11-22',
     // Pantallas donde no aparece el diálogo de reaceptación: leer los términos y la política, o pedir la baja.
     rutasSinAceptacion: Object.freeze(['/terminos', '/privacidad', '/perfil']),

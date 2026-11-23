@@ -2,13 +2,18 @@ import Button from 'react-bootstrap/Button';
 import { describir, ESTADO_USUARIO, ETIQUETA_ROL } from '../config/catalogos.js';
 import { t } from '../i18n/index.js';
 import { formatearFechaHora } from '../utils/formatos.js';
+import { complejosDeUsuario } from '../utils/sistema.js';
 import { CeldaTabla } from './TablaApilable.jsx';
 
 const columnas = 'usuarios.columnas';
 
-/** Fila de una cuenta: id, datos de contacto, rol, complejo operado (si es operador), estado, alta y la acción de abrir su ficha. */
+/**
+ * Fila de una cuenta: id, datos de contacto, rol, sus complejos (los que tiene como titular un dueño o el que opera un
+ * operador), estado, alta y la acción de abrir su ficha.
+ */
 export default function UsuarioRow({ usuario, onAbrir }) {
   const estado = describir(ESTADO_USUARIO, usuario.estado);
+  const complejos = complejosDeUsuario(usuario);
 
   return (
     <tr>
@@ -19,7 +24,11 @@ export default function UsuarioRow({ usuario, onAbrir }) {
         {usuario.telefono && <div className="small text-secondary num">{usuario.telefono}</div>}
       </CeldaTabla>
       <CeldaTabla etiqueta={t(`${columnas}.rol`)}>{ETIQUETA_ROL[usuario.rol] ?? usuario.rol}</CeldaTabla>
-      <CeldaTabla etiqueta={t(`${columnas}.complejo`)}>{usuario.complejo_operado_nombre || '-'}</CeldaTabla>
+      <CeldaTabla etiqueta={t(`${columnas}.complejo`)}>
+        {complejos.length > 0
+          ? complejos.map((complejo) => <div key={complejo.id}>{complejo.nombre}</div>)
+          : '-'}
+      </CeldaTabla>
       <CeldaTabla etiqueta={t(`${columnas}.estado`)}>
         <span className={`badge ${estado.badge}`}>{estado.etiqueta}</span>
       </CeldaTabla>

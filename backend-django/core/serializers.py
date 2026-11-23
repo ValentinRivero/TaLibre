@@ -684,6 +684,9 @@ class ContratoEstadoSerializer(serializers.Serializer):
 class UsuarioAdminSerializer(serializers.ModelSerializer):
     rol = serializers.CharField(source='rol.nombre', read_only=True)
     complejo_operado_nombre = serializers.CharField(source='complejo_operado.nombre', read_only=True, default=None)
+    complejos_propios = serializers.SerializerMethodField(
+        help_text='Complejos no dados de baja de los que la cuenta es titular, ordenados por nombre.',
+    )
     estado_nombre = serializers.CharField(source='get_estado_display', read_only=True)
 
     class Meta:
@@ -696,6 +699,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             'rol',
             'complejo_operado',
             'complejo_operado_nombre',
+            'complejos_propios',
             'estado',
             'estado_nombre',
             'version_politica_aceptada',
@@ -704,6 +708,14 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             'fecha_modificacion',
         )
         read_only_fields = fields
+
+    @extend_schema_field(REFERENCIAS)
+    def get_complejos_propios(self, usuario):
+        # El listado los trae precargados. La respuesta de una edición parte de una instancia nueva y los consulta.
+        complejos = getattr(usuario, 'complejos_propios_vigentes', None)
+        if complejos is None:
+            complejos = ComplejoRepository.propios_vigentes(usuario.pk)
+        return [{'id': complejo.id, 'nombre': complejo.nombre} for complejo in complejos]
 
 
 class UsuarioAdminEdicionSerializer(serializers.Serializer):

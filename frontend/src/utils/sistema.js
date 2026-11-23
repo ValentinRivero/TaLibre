@@ -66,6 +66,19 @@ export const rutaDeFichaUsuario = (id) => `/sistema?verUsuario=${encodeURICompon
 
 export const FILTROS_USUARIOS_INICIALES = Object.freeze({ rol: '', estado: '', busqueda: '' });
 
+/**
+ * Complejos vinculados a una cuenta como `{ id, nombre }`: los que tiene como titular un dueño (pueden ser varios) o
+ * el único que opera un operador. Las demás cuentas no tienen ninguno.
+ */
+export const complejosDeUsuario = (usuario) => {
+  const propios = usuario?.complejos_propios ?? [];
+  if (propios.length > 0) return propios;
+  if (usuario?.complejo_operado && usuario.complejo_operado_nombre) {
+    return [{ id: usuario.complejo_operado, nombre: usuario.complejo_operado_nombre }];
+  }
+  return [];
+};
+
 /** Parámetros de `GET /api/usuarios/` con los filtros y la página. */
 export const aParametrosUsuarios = (filtros, pagina) => sinVacios({
   page: pagina,
