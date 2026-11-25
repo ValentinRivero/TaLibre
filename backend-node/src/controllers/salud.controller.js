@@ -1,3 +1,3 @@
 export const obtenerSalud = (req, res) => {
-  res.json({ estado: 'ok' });
+  res.json({ estado: 'activo' });
 };
